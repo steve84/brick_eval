@@ -1,6 +1,16 @@
 import json
 import requests
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from models import Set
+
+
+engine = create_engine('sqlite:///rebrickable.db')
+Session = sessionmaker(bind=engine)
+session = Session()
+
 headers = {
     'x-locale': 'de-CH',
     'content-type': 'application/json',
@@ -10,10 +20,31 @@ data = json.loads('{"operationName":"SearchSuggestions","variables":{"query":"75
 
 s = requests.Session()
 
-sets = ['21039','21047','75232','40354']
-for set in sets:
-  data['variables']['query'] = set
-  response = s.post('https://www.lego.com/api/graphql/SearchSuggestions', headers=headers, json=data)
-  json_resp = response.json()
-  if 'data' in json_resp.keys() and 'searchSuggestions' in json_resp['data'].keys() and len(json_resp['data']['searchSuggestions']) == 1:
-    print('%s: %d' % (set, json_resp['data']['searchSuggestions'][0]['variant']['price']['centAmount']))
+sets = session.query(Set).filter(
+  Set.retail == None,
+  Set.year_of_publication >= 2019
+).all()
+
+max_requests = 250
+i = 0
+for setrow in sets:
+  if i < max_requests:
+    setnr = setrow.set_num.split('-')[0]
+    data['variables']['query'] = setnr
+    response = s.post('https://www.lego.com/api/graphql/SearchSuggestions', headers=headers, json=data)
+    json_resp = response.json()
+    if 'data' in json_resp.keys() and 'searchSuggestions' in json_resp['data'].keys() and json_resp['data']['searchSuggestions'] is not None and len(json_resp['data']['searchSuggestions']) == 1:
+      set_data = json_resp['data']['searchSuggestions'][0]
+      if 'productCode' in set_data.keys() and 'variant' in set_data.keys() and set_data['productCode'] == setnr:
+        price = set_data['variant']['price']['centAmount']
+        print('%s: %d' % (setrow.set_num, price))
+        setrow.retail = int(price)
+        setrow.eol = False
+    else:
+      print('Setnr not found: %s' % setrow.set_num)
+      setrow.retail = -1
+      setrow.eol = True
+    i += 1
+
+
+session.commit()

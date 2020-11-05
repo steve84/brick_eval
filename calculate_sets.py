@@ -9,8 +9,8 @@ from models import Inventory, InventoryPart, Part, PartCategory, InventorySet, I
 from extended_models import Score, Property, InventoryPartView, InventoryMinifigPartView
 
 
-def calcScore(set_num, max_amount_of_part, parts_of_set, q_total_amount_in_sets, is_minifig=False):
-    min_amount_of_part = 1
+def calcScore(set_num, max_amount_of_part, parts_of_set, is_minifig=False):
+    min_amount_of_part = 0
 
     if len(parts_of_set) == 0:
         return -1
@@ -26,25 +26,14 @@ def calcScore(set_num, max_amount_of_part, parts_of_set, q_total_amount_in_sets,
         color_id = part.color_id
         quantity = part.quantity
 
-        if is_minifig:
-            amount_in_sets = q_total_amount_in_sets.filter(
-                InventoryMinifigPartView.part_num==part_num,
-                InventoryMinifigPartView.color_id==color_id
-            ).first()
-        else:
-            amount_in_sets = q_total_amount_in_sets.filter(
-                InventoryPartView.part_num==part_num,
-                InventoryPartView.color_id==color_id
-            ).first()
-
-        total_score += (quantity / total_parts) * pow(1 - ((amount_in_sets.ct - min_amount_of_part) / (max_amount_of_part - min_amount_of_part)), 100)
+        total_score += (quantity / total_parts) * pow(1 - ((part.total_quantity - min_amount_of_part) / (max_amount_of_part.total_quantity - min_amount_of_part)), 100)
 
     totalTime = time.time() - startTime
     print('Calculated score of set in %f seconds (%f seconds per part)' % (totalTime, totalTime / total_parts))
     return total_score
 
 
-def processInventory(session, inventory_id, set_num, max_amount, amount_parts_in_inventories, is_minifig=False):
+def processInventory(session, inventory_id, set_num, max_amount, is_minifig=False):
     inventory_type = 's'
 
     if is_minifig:
@@ -60,7 +49,7 @@ def processInventory(session, inventory_id, set_num, max_amount, amount_parts_in
     else:
         parts = session.query(InventoryPartView).filter(InventoryPartView.inventory_id == inventory_id).all()
 
-    score = calcScore(set_num, max_amount, parts, amount_parts_in_inventories, is_minifig)
+    score = calcScore(set_num, max_amount, parts, is_minifig)
     print('Set %s has a score of: %f' % (set_num, score))
     #import pdb;pdb.set_trace()
     if actual_score is None:
@@ -99,24 +88,8 @@ engine = create_engine('sqlite:///rebrickable.db')
 Session = sessionmaker(bind=engine)
 session = Session()
 
-amount_parts_in_set_inventories = session.query(
-    InventoryPartView.part_num,
-    InventoryPartView.color_id,
-    func.sum(InventoryPartView.quantity).label('ct')
-).group_by(
-    InventoryPartView.part_num, InventoryPartView.color_id
-)
-
-amount_parts_in_minifig_inventories = session.query(
-    InventoryMinifigPartView.part_num,
-    InventoryMinifigPartView.color_id,
-    func.sum(InventoryMinifigPartView.quantity).label('ct')
-).group_by(
-    InventoryMinifigPartView.part_num, InventoryMinifigPartView.color_id
-)
-
-max_amount_set = amount_parts_in_set_inventories.order_by(desc('ct')).first().ct
-max_amount_minifig = amount_parts_in_minifig_inventories.order_by(desc('ct')).first().ct
+max_amount_set = session.query(InventoryPartView.total_quantity).order_by(desc(InventoryPartView.total_quantity)).first()
+max_amount_minifig = session.query(InventoryMinifigPartView.total_quantity).order_by(desc(InventoryMinifigPartView.total_quantity)).first()
 
 needs_recalc = session.query(Score.inventory_number).filter(Score.needs_recalc == False)
 set_of_sets = session.query(InventorySet.inventory_id).distinct()
@@ -143,7 +116,7 @@ for inventory_set in inventories:
     if i < max_inventories:
         processInventory(
             session, inventory_set.id, inventory_set.set_num,
-            max_amount_set, amount_parts_in_set_inventories
+            max_amount_set
         )
         
         fig_nums = session.query(InventoryMinifig.fig_num).filter(
@@ -158,7 +131,7 @@ for inventory_set in inventories:
             processInventory(
                 session, inventory_minifig.id,
                 inventory_minifig.set_num, max_amount_minifig,
-                amount_parts_in_minifig_inventories, True
+                True
         )
 
     session.commit()

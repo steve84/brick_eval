@@ -23,18 +23,17 @@ data = json.loads('{"operationName":"SearchSuggestions","variables":{"query":"75
 s = requests.Session()
 
 sets = session.query(Set).filter(
-  Set.retail_price == None,
   Set.eol == '-1',
-  Set.year_of_publication >= 2019
+  Set.year_of_publication >= 2016
 ).all()
 
-max_requests = 10000
+max_requests = 1000
 i = 0
 for setrow in sets:
   if i < max_requests:
     if i > 0 and i % 50 == 0:
         session.commit()
-        time.sleep(30)
+        time.sleep(10)
     setnr = setrow.set_num.split('-')[0]
     data['variables']['query'] = setnr
     response = s.post('https://www.lego.com/api/graphql/SearchSuggestions', headers=headers, json=data)
@@ -48,7 +47,6 @@ for setrow in sets:
         setrow.eol = '1'
     else:
       print('Setnr not found: %s' % setrow.set_num)
-      setrow.retail_price = -1
       setrow.eol = '0'
     i += 1
 

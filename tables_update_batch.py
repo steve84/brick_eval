@@ -39,6 +39,7 @@ engine = create_engine(conn_string)
 excluded_fields = dict()
 
 excluded_fields['sets'] = ['eol', 'retail_price']
+excluded_fields['inventory_parts'] = ['total_quantity']
 
 for m in modules:
     tablename = m.__tablename__

@@ -63,20 +63,17 @@ left join inventory_parts p on p.inventory_id = i.id;
 // Views
 
 create view 'v_inventory_minifig_parts' as
-select inventory_id, part_num, color_id, sum(quantity) as quantity, sum(total_quantity) as total_quantity
-from (select p.inventory_id, p.part_num, p.color_id, p.is_spare, (im.quantity * p.quantity) as quantity, p.total_quantity from inventories i
-left join inventory_minifigs im on i.id = im.inventory_id
-left join inventories ism on im.fig_num = ism.set_num
-left join inventory_parts p on p.inventory_id = ism.id
-where p.inventory_id is not null)
-group by inventory_id, part_num, color_id;
+select inventory_id, part_num, color_id, total_quantity, sum(quantity) as quantity
+from (select ip.inventory_id, ip.part_num, ip.color_id, ip.total_quantity, (ip.quantity * im.quantity) as quantity from inventory_minifigs im
+left join inventories i on im.fig_num = i.set_num
+left join inventory_parts ip on i.id = ip.inventory_id)
+group by inventory_id, part_num, color_id, total_quantity;
 
 create view 'v_inventory_parts' as
-select inventory_id, part_num, color_id, sum(quantity) as quantity, sum(total_quantity) as total_quantity
-from (select p.inventory_id, p.part_num, p.color_id, p.is_spare, p.quantity, p.total_quantity from inventories i
-left join inventory_parts p on p.inventory_id = i.id
-where p.inventory_id is not null and i.set_num not like 'fig-%')
-group by inventory_id, part_num, color_id;
+select inventory_id, part_num, color_id, total_quantity, sum(quantity) as quantity
+from (select p.inventory_id, p.part_num, p.color_id, p.quantity, p.total_quantity from (select * from inventories where set_num not in (select fig_num from inventory_minifigs)) i
+left join inventory_parts p on p.inventory_id = i.id)
+group by inventory_id, part_num, color_id, total_quantity;
 
 
 // Cleanup statements
@@ -162,26 +159,34 @@ Y if inventory_number in ['10220-1','10252-1','10256-1','10260-1','10263-1','102
 
 
 // Update total_quantity
-
 create view v_total_quantities as
-select part_num, color_id, is_spare, sum(quantity) as total_quantity from inventory_parts ip
-group by part_num, color_id, is_spare;
+select part_num, color_id, sum(total_quantity) as total_quantity
+from (select part_num, color_id, sum(quantity) as total_quantity
+from (select ip.inventory_id, ip.part_num, ip.color_id, (ip.quantity * im.quantity) as quantity
+from (select fig_num, sum(quantity) as quantity from inventory_minifigs group by fig_num) im
+left join inventories i on im.fig_num = i.set_num
+left join inventory_parts ip on i.id = ip.inventory_id)
+group by part_num, color_id
+union all
+select part_num, color_id, sum(quantity) as total_quantity 
+from (select p.part_num, p.color_id, p.quantity from (select * from inventories where set_num not in (select fig_num from inventory_minifigs)) i
+left join inventory_parts p on p.inventory_id = i.id)
+group by part_num, color_id)
+group by part_num, color_id;
 
 UPDATE inventory_parts
 SET
       total_quantity = (SELECT v_total_quantities.total_quantity 
                             FROM v_total_quantities
                             WHERE v_total_quantities.part_num = inventory_parts.part_num AND 
-							v_total_quantities.color_id = inventory_parts.color_id AND
-							v_total_quantities.is_spare = inventory_parts.is_spare) - inventory_parts.quantity
+							v_total_quantities.color_id = inventory_parts.color_id)
 
 WHERE
     EXISTS (
         SELECT *
         FROM v_total_quantities
         WHERE v_total_quantities.part_num = inventory_parts.part_num AND 
-							v_total_quantities.color_id = inventory_parts.color_id AND
-							v_total_quantities.is_spare = inventory_parts.is_spare
+							v_total_quantities.color_id = inventory_parts.color_id
     );
 
 drop view v_total_quantities;

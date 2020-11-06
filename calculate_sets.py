@@ -10,7 +10,6 @@ from extended_models import Score, Property, InventoryPartView, InventoryMinifig
 
 
 def calcScore(set_num, max_amount_of_part, parts_of_set, is_minifig=False):
-    min_amount_of_part = 0
 
     if len(parts_of_set) == 0:
         return -1
@@ -26,7 +25,7 @@ def calcScore(set_num, max_amount_of_part, parts_of_set, is_minifig=False):
         color_id = part.color_id
         quantity = part.quantity
 
-        total_score += (quantity / total_parts) * pow(1 - ((part.total_quantity - min_amount_of_part) / (max_amount_of_part.total_quantity - min_amount_of_part)), 100)
+        total_score += (quantity / total_parts) * pow(1 - ((part.total_quantity - quantity) / max_amount_of_part.total_quantity), 100)
 
     totalTime = time.time() - startTime
     print('Calculated score of set in %f seconds (%f seconds per part)' % (totalTime, totalTime / total_parts))
@@ -44,30 +43,32 @@ def processInventory(session, inventory_id, set_num, max_amount, is_minifig=Fals
         Score.inventory_type == inventory_type
     )).first()
 
-    if is_minifig:
-        parts = session.query(InventoryMinifigPartView).filter(InventoryMinifigPartView.inventory_id == inventory_id).all()
-    else:
-        parts = session.query(InventoryPartView).filter(InventoryPartView.inventory_id == inventory_id).all()
+    if actual_score is None or actual_score.needs_recalc:
 
-    score = calcScore(set_num, max_amount, parts, is_minifig)
-    print('Set %s has a score of: %f' % (set_num, score))
-    #import pdb;pdb.set_trace()
-    if actual_score is None:
-        # insert
-        session.add(Score(
-            inventory_id = inventory_id,
-            inventory_number = set_num,
-            inventory_type = inventory_type,
-            needs_recalc = False,
-            score = score
-        ))
-    elif actual_score.needs_recalc:
-        # update
-        actual_score.needs_recalc = False
-        actual_score.score = score
+        if is_minifig:
+            parts = session.query(InventoryMinifigPartView).filter(InventoryMinifigPartView.inventory_id == inventory_id).all()
+        else:
+            parts = session.query(InventoryPartView).filter(InventoryPartView.inventory_id == inventory_id).all()
+
+        score = calcScore(set_num, max_amount, parts, is_minifig)
+        print('Set %s has a score of: %f' % (set_num, score))
+        #import pdb;pdb.set_trace()
+        if actual_score is None:
+            # insert
+            session.add(Score(
+                inventory_id = inventory_id,
+                inventory_number = set_num,
+                inventory_type = inventory_type,
+                needs_recalc = False,
+                score = score
+            ))
+        elif actual_score.needs_recalc:
+            # update
+            actual_score.needs_recalc = False
+            actual_score.score = score
     else:
         # nothing to do
-        print('error')
+        print('Set %s already calculated' % set_num)
 
 
 

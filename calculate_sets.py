@@ -80,9 +80,12 @@ parser.add_argument('--themes', dest='themes', type=str,
                    help='comma separated theme ids of the sets')
 parser.add_argument('--max_items', dest='max_items', type=int, default=10,
                    help='max sets to process')
+parser.add_argument('--eol', dest='eol', type=str,
+                   help='comma separated eol states')
 
 themes_id = None if parser.parse_args().themes is None else parser.parse_args().themes.split(',')
 years = None if parser.parse_args().years is None else parser.parse_args().years.split(',')
+eol = None if parser.parse_args().eol is None else parser.parse_args().eol.split(',')
 max_inventories = parser.parse_args().max_items
 
 engine = create_engine('sqlite:///rebrickable.db')
@@ -100,6 +103,8 @@ if years is not None:
     add_filters += (Set.year_of_publication.in_([y for y in map(lambda x: int(x), years)]),)
 if themes_id is not None:
     add_filters += (Set.theme_id.in_([t for t in map(lambda x: int(x), themes_id)]),)
+if eol is not None:
+    add_filters += (Set.eol.in_([e for e in map(lambda x: str(x), eol)]),)
 
 sets_to_check = session.query(Set.set_num).filter(*add_filters).distinct()
 

@@ -1,3 +1,4 @@
+import argparse
 import json
 import requests
 import time
@@ -7,6 +8,14 @@ from sqlalchemy.orm import sessionmaker
 
 from models import Set
 
+parser = argparse.ArgumentParser(description='Get prices and eol state of sets.')
+parser.add_argument('--eol', dest='eol', type=str,
+                    default='-1', help='comma separated eol states')
+parser.add_argument('--max_items', dest='max_items', type=int, default=10,
+                   help='max sets to process')
+
+eol = None if parser.parse_args().eol is None else parser.parse_args().eol.split(',')
+max_items = parser.parse_args().max_items
 
 engine = create_engine('sqlite:///rebrickable.db')
 Session = sessionmaker(bind=engine)
@@ -22,33 +31,35 @@ data = json.loads('{"operationName":"SearchSuggestions","variables":{"query":"75
 
 s = requests.Session()
 
-sets = session.query(Set).filter(
-  Set.eol == '-1',
-  Set.year_of_publication >= 2016
-).all()
+add_filters = tuple()
+if eol is not None:
+    add_filters += (Set.eol.in_([e for e in map(lambda x: str(x), eol)]),)
 
-max_requests = 1000
+sets = session.query(Set).filter(*add_filters).all()
+
 i = 0
 for setrow in sets:
-  if i < max_requests:
-    if i > 0 and i % 50 == 0:
-        session.commit()
-        time.sleep(10)
-    setnr = setrow.set_num.split('-')[0]
-    data['variables']['query'] = setnr
-    response = s.post('https://www.lego.com/api/graphql/SearchSuggestions', headers=headers, json=data)
-    json_resp = response.json()
-    if 'data' in json_resp.keys() and 'searchSuggestions' in json_resp['data'].keys() and json_resp['data']['searchSuggestions'] is not None and len(json_resp['data']['searchSuggestions']) == 1:
-      set_data = json_resp['data']['searchSuggestions'][0]
-      if 'productCode' in set_data.keys() and 'variant' in set_data.keys() and set_data['productCode'] == setnr:
-        price = set_data['variant']['price']['centAmount']
-        print('%s: %d' % (setrow.set_num, price))
-        setrow.retail_price = int(price)
-        setrow.eol = '1'
-    else:
-      print('Setnr not found: %s' % setrow.set_num)
-      setrow.eol = '0'
-    i += 1
+    if i < max_items:
+        if i > 0 and i % 50 == 0:
+            session.commit()
+            time.sleep(10)
+        setnr = setrow.set_num.split('-')[0]
+        data['variables']['query'] = setnr
+        response = s.post('https://www.lego.com/api/graphql/SearchSuggestions', headers=headers, json=data)
+        json_resp = response.json()
+        if 'data' in json_resp.keys() and 'searchSuggestions' in json_resp['data'].keys() and json_resp['data']['searchSuggestions'] is not None and len(json_resp['data']['searchSuggestions']) == 1:
+            set_data = json_resp['data']['searchSuggestions'][0]
+            if 'productCode' in set_data.keys() and 'variant' in set_data.keys() and set_data['productCode'] == setnr:
+                price = set_data['variant']['price']['centAmount']
+                print('%s: %d' % (setrow.set_num, price))
+                setrow.retail_price = int(price)
+                if str(setrow.eol) not in ['2', '3']:
+                    setrow.eol = '1'
+        else:
+            print('Setnr not found: %s' % setrow.set_num)
+            setrow.eol = '0'
+        i += 1
 
 
 session.commit()
+

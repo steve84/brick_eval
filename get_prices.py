@@ -9,11 +9,17 @@ from sqlalchemy.orm import sessionmaker
 from models import Set
 
 parser = argparse.ArgumentParser(description='Get prices and eol state of sets.')
+parser.add_argument('--years', dest='years', type=str,
+                   help='comma separated years of publication of the sets')
+parser.add_argument('--themes', dest='themes', type=str,
+                   help='comma separated theme ids of the sets')
 parser.add_argument('--eol', dest='eol', type=str,
                     default='-1', help='comma separated eol states')
 parser.add_argument('--max_items', dest='max_items', type=int, default=10,
                    help='max sets to process')
 
+themes_id = None if parser.parse_args().themes is None else parser.parse_args().themes.split(',')
+years = None if parser.parse_args().years is None else parser.parse_args().years.split(',')
 eol = None if parser.parse_args().eol is None else parser.parse_args().eol.split(',')
 max_items = parser.parse_args().max_items
 
@@ -32,6 +38,11 @@ data = json.loads('{"operationName":"SearchSuggestions","variables":{"query":"75
 s = requests.Session()
 
 add_filters = tuple()
+add_filters += (Set.retail_price == None,)
+if years is not None:
+    add_filters += (Set.year_of_publication.in_([y for y in map(lambda x: int(x), years)]),)
+if themes_id is not None:
+    add_filters += (Set.theme_id.in_([t for t in map(lambda x: int(x), themes_id)]),)
 if eol is not None:
     add_filters += (Set.eol.in_([e for e in map(lambda x: str(x), eol)]),)
 

@@ -44,8 +44,9 @@ left join themes t2 on t1.parent_id = t2.id
 left join themes t3 on t2.parent_id = t3.id
 where s.eol in ('2', '3');
 
-select set_num, name, year_of_publication, num_parts, retail_price, category_l1, category_l2, category_l3, score, sum(quantity) as quantity, sum(score_minifig) / sum(quantity) as score_minifig from
-(select s.set_num, s.name, s.year_of_publication, s.num_parts, (s.retail_price * 1.0) / 100 as retail_price, t1.name as category_l1, t2.name as category_l2, t3.name as category_l3, sc.score, im.fig_num, im.quantity, scm.score * im.quantity as score_minifig from sets s
+create view v_scores_all as
+select set_num, name, year_of_publication, num_parts, eol, retail_price, category_l1, category_l2, category_l3, score, sum(quantity) as quantity, sum(score_minifig) / sum(quantity) as score_minifig from
+(select s.set_num, s.name, s.year_of_publication, s.num_parts, s.eol, (s.retail_price * 1.0) / 100 as retail_price, t1.name as category_l1, t2.name as category_l2, t3.name as category_l3, sc.score, im.fig_num, im.quantity, scm.score * im.quantity as score_minifig from sets s
 left join scores sc on s.set_num = sc.inventory_number
 left join inventories i on s.set_num = i.set_num
 left join inventory_minifigs im on i.id = im.inventory_id
@@ -54,8 +55,8 @@ left join scores scm on invm.set_num = scm.inventory_number
 left join themes t1 on s.theme_id = t1.id
 left join themes t2 on t1.parent_id = t2.id
 left join themes t3 on t2.parent_id = t3.id
-where s.eol in ('2', '3'))
-group by set_num, name, year_of_publication, num_parts, retail_price, category_l1, category_l2, category_l3, score;
+where s.eol <> '-1')
+group by set_num, name, year_of_publication, num_parts, eol, retail_price, category_l1, category_l2, category_l3, score;
 
 
 create view 'v_inventory_pure_lego' as

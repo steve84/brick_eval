@@ -2,6 +2,7 @@ from flask import Flask
 from flask_restful import Api
 
 from db import db
+from ma import ma
 
 from resources.color import Color
 from resources.element import Element
@@ -33,4 +34,5 @@ def create_tables():
 
 if __name__ == '__main__':
     db.init_app(app)
+    ma.init_app(app)
     app.run(port=5000, debug=True)

@@ -6,13 +6,14 @@ from sqlalchemy import (
 )
 
 from db import db
+from models.set import SetModel
 
 
 class InventoryModel(db.Model):
     __tablename__ = 'inventories'
     __table_args__ = (
         db.Index('inventory_index', 'version', 'set_inv_id',
-                 'minifig_inv_id', unique=True)
+                 'minifig_inv_id', unique=True),
     )
 
     id = Column(Integer, primary_key=True)
@@ -20,17 +21,12 @@ class InventoryModel(db.Model):
     set_inv_id = Column(Integer, db.ForeignKey('inventory_sets.id'))
     minifig_inv_id = Column(Integer, db.ForeignKey('inventory_minifigs.id'))
 
-    def __init__(self, version, set_inv_id, minifig_inv_id):
-        self.version = version
-        self.set_inv_id = set_inv_id
-        self.minifig_inv_id = minifig_inv_id
-
 
 class InventoryMinifigModel(db.Model):
     __tablename__ = 'inventory_minifigs'
     __table_args__ = (
         db.Index('inventory_minifig_index',
-                 'inventory_id', 'fig_id', unique=True)
+                 'inventory_id', 'fig_id', unique=True),
     )
 
     id = Column(Integer, primary_key=True)
@@ -41,11 +37,6 @@ class InventoryMinifigModel(db.Model):
 
     minifig = db.relationship('MinifigModel')
 
-    def __init__(self, inventory_id, fig_id, quantity):
-        self.inventory_id = inventory_id
-        self.fig_id = fig_id
-        self.quantity = quantity
-
 
 class InventoryPartModel(db.Model):
     __tablename__ = 'inventory_parts'
@@ -54,7 +45,7 @@ class InventoryPartModel(db.Model):
                  'part_id', 'color_id', 'is_spare', unique=True),
         db.Index('inventory_part_index_1',
                  'inventory_id', 'part_id', 'color_id'),
-        db.Index('inventory_part_index_2', 'part_id', 'color_id')
+        db.Index('inventory_part_index_2', 'part_id', 'color_id'),
     )
 
     id = Column(Integer, primary_key=True)
@@ -66,21 +57,14 @@ class InventoryPartModel(db.Model):
     is_spare = Column(Boolean, nullable=False)
     total_quantity = Column(Integer)
 
-    part = db.relationship('PartModel')
     color = db.relationship('ColorModel')
-
-    def __init__(self, inventory_id, part_id, color_id, quantity, is_spare):
-        self.inventory_id = inventory_id
-        self.part_id = part_id
-        self.color_id = color_id
-        self.quantity = quantity
-        self.is_spare = is_spare
+    part = db.relationship('PartModel')
 
 
 class InventorySetModel(db.Model):
     __tablename__ = 'inventory_sets'
     __table_args__ = (
-        db.Index('inventory_set_index', 'inventory_id', 'set_id', unique=True)
+        db.Index('inventory_set_index', 'inventory_id', 'set_id', unique=True),
     )
 
     id = Column(Integer, primary_key=True)
@@ -90,8 +74,3 @@ class InventorySetModel(db.Model):
     quantity = Column(Integer, nullable=False)
 
     set = db.relationship('SetModel')
-
-    def __init__(self, inventory_id, set_id, quantity):
-        self.inventory_id = inventory_id
-        self.set_id = set_id
-        self.quantity = quantity

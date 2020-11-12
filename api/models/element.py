@@ -11,7 +11,7 @@ class ElementModel(db.Model):
     __tablename__ = 'elements'
     __table_args__ = (
         db.Index('element_index', 'element_id',
-                 'part_id', 'color_id', unique=True)
+                 'part_id', 'color_id', unique=True),
     )
 
     id = Column(Integer, primary_key=True)
@@ -21,7 +21,3 @@ class ElementModel(db.Model):
 
     color = db.relationship('ColorModel')
     part = db.relationship('PartModel')
-
-    def __init__(self, part_id, color_id):
-        self.part_id = part_id
-        self.color_id = color_id

@@ -16,11 +16,5 @@ class ThemeModel(db.Model):
     name = Column(Text, nullable=False)
     parent_id = Column(DECIMAL(4, 1), db.ForeignKey('themes.id'))
 
-    sub_theme = db.relationship('ThemeModel', lazy='dynamic')
-
-    def __init__(self, name, parent_id):
-        self.name = name
-        self.parent_id = parent_id
-
-    def json(self):
-        return {'name': self.name}
+    children = db.relationship("ThemeModel",
+                               backref=db.backref('parent', remote_side=[id]))

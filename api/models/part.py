@@ -13,15 +13,12 @@ class PartCategoryModel(db.Model):
     id = Column(Integer, primary_key=True)
     name = Column(Text, nullable=False)
 
-    def __init__(self, name):
-        self.name = name
-
 
 class PartRelationshipModel(db.Model):
     __tablename__ = 'part_relationships'
     __table_args__ = (
-        db.UniqueConstraint('part_relationship_index', 'rel_type',
-                            'child_part_id', 'parent_part_id', unique=True)
+        db.UniqueConstraint('rel_type', 'child_part_id',
+                            'parent_part_id', name='part_relationship_index'),
     )
 
     id = Column(Integer, primary_key=True)
@@ -31,11 +28,6 @@ class PartRelationshipModel(db.Model):
 
     child_part = db.relationship('PartModel', foreign_keys=[child_part_id])
     parent_part = db.relationship('PartModel', foreign_keys=[parent_part_id])
-
-    def __init__(self, rel_type, child_part_id, parent_part_id):
-        self.rel_type = rel_type
-        self.child_part_id = child_part_id
-        self.parent_part_id = parent_part_id
 
 
 class PartModel(db.Model):
@@ -50,9 +42,3 @@ class PartModel(db.Model):
     part_material = Column(Text, nullable=False)
 
     part_category = db.relationship('PartCategoryModel')
-
-    def __init__(self, part_num, name, part_cat_id, part_material):
-        self.part_num = part_num
-        self.name = name
-        self.part_cat_id = part_cat_id
-        self.part_material = part_material

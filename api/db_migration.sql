@@ -19,8 +19,9 @@ SELECT set_num, name, year_of_publication, theme_id, num_parts FROM sets_tmp;
 INSERT OR REPLACE INTO parts (part_num, name, part_cat_id, part_material)
 SELECT part_num, name, part_cat_id, part_material FROM parts_tmp;
 
-INSERT OR REPLACE INTO elements (element_id, part_num, color_id)
-SELECT element_id, part_num, color_id FROM elements_tmp;
+INSERT OR REPLACE INTO elements (element_id, part_id, color_id)
+SELECT element_id, p.id, color_id FROM elements_tmp e
+left join parts p on e.part_num = p.part_num;
 
 
 

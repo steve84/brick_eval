@@ -36,6 +36,7 @@ for csv_file in csv_files:
         df['parent_id'] = df['parent_id'].where(pd.notnull(df['parent_id']), None)
    
     table_name += '_tmp'
+    print("Create table '{}'".format(table_name))
     # create table model
     table = Table(df.to_dict(orient='records'), table_name=table_name, varying_length_text=True)
     # generate sql script

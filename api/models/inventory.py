@@ -9,17 +9,38 @@ from db import db
 from models.set import SetModel
 
 
+set_inventory_rel = db.Table('set_inventory_rel',
+                             db.Column('inventory_set_id', db.Integer, db.ForeignKey(
+                                 'inventory_sets.id'), primary_key=True),
+                             db.Column('inventory_id', db.Integer, db.ForeignKey(
+                                 'inventories.id'), primary_key=True)
+                             )
+
+minifig_inventory_rel = db.Table('minifig_inventory_rel',
+                                 db.Column('inventory_minifig_id', db.Integer, db.ForeignKey(
+                                     'inventory_minifigs.id'), primary_key=True),
+                                 db.Column('inventory_id', db.Integer, db.ForeignKey(
+                                     'inventories.id'), primary_key=True)
+                                 )
+
+
 class InventoryModel(db.Model):
     __tablename__ = 'inventories'
-    __table_args__ = (
-        db.Index('inventory_index', 'version', 'set_inv_id',
-                 'minifig_inv_id', unique=True),
-    )
 
     id = Column(Integer, primary_key=True)
     version = Column(Integer, nullable=False)
-    set_inv_id = Column(Integer, db.ForeignKey('inventory_sets.id'))
-    minifig_inv_id = Column(Integer, db.ForeignKey('inventory_minifigs.id'))
+
+    inventory_sets = db.relationship('InventorySetModel',
+                                     secondary=set_inventory_rel,
+                                     lazy='subquery',
+                                     backref=db.backref('inventories',
+                                                        lazy=True))
+
+    inventory_minifigs = db.relationship('InventoryMinifigModel',
+                                         secondary=minifig_inventory_rel,
+                                         lazy='subquery',
+                                         backref=db.backref('inventories',
+                                                            lazy=True))
 
 
 class InventoryMinifigModel(db.Model):

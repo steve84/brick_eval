@@ -14,7 +14,7 @@ class ThemeModel(db.Model):
 
     id = Column(Integer, primary_key=True)
     name = Column(Text, nullable=False)
-    parent_id = Column(DECIMAL(4, 1), db.ForeignKey('themes.id'))
+    parent_id = Column(Integer, db.ForeignKey('themes.id'))
 
     children = db.relationship("ThemeModel",
                                backref=db.backref('parent', remote_side=[id]))

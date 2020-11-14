@@ -18,6 +18,7 @@ class ElementModel(db.Model):
     element_id = Column(Text, nullable=False, unique=True)
     part_id = Column(Integer, db.ForeignKey('parts.id'), nullable=False)
     color_id = Column(Integer, db.ForeignKey('colors.id'), nullable=False)
+    total_amount = Column(Integer, nullable=False, server_default='0')
 
     color = db.relationship('ColorModel')
     part = db.relationship('PartModel')

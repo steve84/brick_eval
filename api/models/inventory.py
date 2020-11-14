@@ -28,6 +28,7 @@ class InventoryModel(db.Model):
     __tablename__ = 'inventories'
 
     id = Column(Integer, primary_key=True)
+    set_id = Column(Integer, db.ForeignKey('sets.id'))
     version = Column(Integer, nullable=False)
 
     inventory_sets = db.relationship('InventorySetModel',

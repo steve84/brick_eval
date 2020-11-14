@@ -1,9 +1,6 @@
 INSERT OR REPLACE INTO colors (id, name, rgb, is_trans)
 SELECT id, name, rgb, is_trans FROM colors_tmp;
 
-INSERT OR REPLACE INTO inventories (id, version)
-SELECT id, version FROM inventories_tmp;
-
 INSERT OR REPLACE INTO minifigs (fig_num, name, num_parts)
 SELECT fig_num, name, num_parts FROM minifigs_tmp;
 
@@ -24,6 +21,9 @@ SELECT element_id, p.id, color_id FROM elements_tmp e
 left join parts p on e.part_num = p.part_num;
 
 
+INSERT OR REPLACE INTO inventories (id, set_id, version)
+SELECT t.id, s.id, version FROM inventories_tmp t
+left join sets s on t.set_num = s.set_num;
 
 INSERT OR REPLACE INTO part_relationships (rel_type, child_part_id, parent_part_id)
 SELECT rel_type, p1.id, p2.id FROM part_relationships_tmp t
@@ -52,6 +52,48 @@ INSERT OR REPLACE INTO set_inventory_rel (inventory_id, inventory_set_id)
 SELECT i.id, invs.id FROM inventory_sets invs
 left join sets s on invs.set_id = s.id
 left join inventories_tmp i on s.set_num = i.set_num;
+
+create view v_total_quantities as
+select * 
+from (select part_id, color_id, quantity
+from (select part_id, color_id, sum(quantity) as quantity
+from (select * from (select * from inventories where set_id is not null) i
+left join (select set_id, max(version) as max_version from inventories group by set_id) as max_i on i.set_id = max_i.set_id and i.version = max_i.max_version
+left join inventory_parts ip on i.id = ip.inventory_id
+where max_i.set_id is not null)
+group by part_id, color_id
+union all
+select ip.part_id, ip.color_id, sum(ip.quantity * im.quantity) as quantity from minifig_inventory_rel mir
+left join inventories i on i.id = mir.inventory_id
+left join inventory_minifigs im on im.id = mir.inventory_minifig_id
+left join inventory_parts ip on i.id = ip.inventory_id
+left join (select im.fig_id, max(i.version) as max_version from minifig_inventory_rel mir
+left join inventories i on i.id = mir.inventory_id
+left join inventory_minifigs im on im.id = mir.inventory_minifig_id
+group by im.fig_id) as im_max on im_max.fig_id = im.fig_id and im_max.max_version = i.version
+group by ip.part_id, ip.color_id)
+group by part_id, color_id)
+where part_id is not null;
+
+
+UPDATE elements
+SET
+      total_amount = (SELECT v_total_quantities.quantity 
+                            FROM v_total_quantities
+                            WHERE v_total_quantities.part_id = elements.part_id AND 
+							v_total_quantities.color_id = elements.color_id)
+
+WHERE
+    EXISTS (
+        SELECT *
+        FROM v_total_quantities
+        WHERE v_total_quantities.part_id = elements.part_id AND 
+							v_total_quantities.color_id = elements.color_id
+    );
+
+
+drop view v_total_quantities;
+
 
 drop table colors_tmp;
 drop table elements_tmp;

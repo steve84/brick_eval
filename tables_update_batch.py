@@ -3,6 +3,7 @@ import inspect
 import math
 import pandas as pd
 import sqlite3
+import os.path
 from operator import itemgetter
 from sqlalchemy import create_engine
 from sqlalchemy.inspection import inspect as sqla_inspect
@@ -10,7 +11,7 @@ from sqlalchemy.inspection import inspect as sqla_inspect
 
 def getSqlValue(colDef, value):
     if colDef.type.python_type == str:
-        return '"%s"' % value
+        return '"%s"' % value.replace('"', '')
     elif colDef.type.python_type == bool:
         return '1' if value else '0'
     else:
@@ -35,8 +36,18 @@ modules = list(filter(lambda x: hasattr(x, '__tablename__'), map(lambda x: x[1],
 
 engine = create_engine(conn_string)
 
+excluded_fields = dict()
+
+excluded_fields['sets'] = ['eol', 'retail_price']
+excluded_fields['inventory_parts'] = ['total_quantity']
+
 for m in modules:
     tablename = m.__tablename__
+
+    if not os.path.exists('exports/%s.csv' % tablename):
+        continue
+
+    print('Update table %s' % tablename)
 
     df_new = pd.read_csv('exports/%s.csv' % tablename)
     df_new = df_new.rename(columns={'year': 'year_of_publication'})
@@ -44,6 +55,7 @@ for m in modules:
     df_old = pd.read_sql_table(tablename, conn_string)
 
     col_defs = [col for col in sqla_inspect(m).columns]
+    col_defs = list(filter(lambda x:  tablename not in excluded_fields.keys() or x.name not in excluded_fields[tablename], col_defs))
     pk_defs = [key for key in sqla_inspect(m).primary_key]
     cols = [col.name for col in col_defs]
     pk = [key.name for key in pk_defs]
@@ -57,7 +69,10 @@ for m in modules:
     df_inserts = dfm[dfm['_merge'] == 'left_only']
     df_inserts_indices = df_inserts.index
 
-    df_inserts[cols].to_sql(tablename, con=engine, index=False, if_exists='append', method='multi')
+    chunk_size = 50
+    for i in range(0, len(df_inserts)):
+        if i % chunk_size == 0:
+            df_inserts.iloc[i:i+chunk_size][cols].to_sql(tablename, con=engine, index=False, if_exists='append', method='multi')
 
     dfm = df_old.merge(df_new, on=pk, how='left', indicator=True, suffixes=('', '_y'))
     df_deletions = dfm[dfm['_merge'] == 'left_only']
@@ -76,7 +91,6 @@ for m in modules:
     df_updates = df_updates.drop(index=df_inserts_indices)
 
     for row in adjustListToSqlTypes(df_updates[cols].values.tolist(), col_defs):
-        import pdb;pdb.set_trace()
         if len(pk) == 1:
             pk_values =  [itemgetter(*indices_of_pk)(row)]
         else:
@@ -84,7 +98,6 @@ for m in modules:
         sql_stmts += 'UPDATE %s SET (%s) = (%s) WHERE (%s) IN ((%s));\n' % (tablename, ','.join(cols), ','.join(row), ','.join(pk), ','.join(pk_values))
     
     if sql_stmts != '':
-        import pdb;pdb.set_trace()
         # write to db
         db = sqlite3.connect(db_file)
         cursor = db.cursor()

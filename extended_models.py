@@ -31,7 +31,7 @@ class InventoryMinifigPartView(Base):
     part_num = Column(Text, primary_key=True, nullable=False)
     color_id = Column(Integer, primary_key=True, nullable=False)
     quantity = Column(Integer, nullable=False)
-    is_spare = Column(Boolean, primary_key=True, nullable=False)
+    total_quantity = Column(Integer)
 
 
 class InventoryPartView(Base):
@@ -41,4 +41,4 @@ class InventoryPartView(Base):
     part_num = Column(Text, primary_key=True, nullable=False)
     color_id = Column(Integer, primary_key=True, nullable=False)
     quantity = Column(Integer, nullable=False)
-    is_spare = Column(Boolean, primary_key=True, nullable=False)
+    total_quantity = Column(Integer)

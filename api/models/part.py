@@ -42,3 +42,15 @@ class PartModel(db.Model):
     part_material = Column(Text, nullable=False)
 
     part_category = db.relationship('PartCategoryModel')
+
+
+class PartColorFrequencyModel(db.Model):
+    __tablename__ = 'part_color_frequencies'
+    __table_args__ = (
+        db.UniqueConstraint('color_id', 'part_id', name='part_color_freq_index'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    part_id = Column(Integer, db.ForeignKey('parts.id'), nullable=False)
+    color_id = Column(Integer, db.ForeignKey('colors.id'), nullable=False)
+    total_amount = Column(Integer, nullable=False, server_default='0')

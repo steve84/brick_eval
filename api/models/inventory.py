@@ -30,6 +30,7 @@ class InventoryModel(db.Model):
     id = Column(Integer, primary_key=True)
     set_id = Column(Integer, db.ForeignKey('sets.id'))
     version = Column(Integer, nullable=False)
+    is_latest = Column(Boolean, nullable=False, server_default='1')
 
     inventory_sets = db.relationship('InventorySetModel',
                                      secondary=set_inventory_rel,
@@ -77,7 +78,6 @@ class InventoryPartModel(db.Model):
     color_id = Column(Integer, db.ForeignKey('colors.id'), nullable=False)
     quantity = Column(Integer, nullable=False)
     is_spare = Column(Boolean, nullable=False)
-    total_quantity = Column(Integer)
 
     color = db.relationship('ColorModel')
     part = db.relationship('PartModel')

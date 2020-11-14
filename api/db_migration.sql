@@ -21,6 +21,9 @@ SELECT element_id, p.id, color_id FROM elements_tmp e
 left join parts p on e.part_num = p.part_num;
 
 
+INSERT OR REPLACE INTO part_color_frequencies (part_id, color_id)
+SELECT part_id, color_id FROM inventory_parts;
+
 INSERT OR REPLACE INTO inventories (id, set_id, version)
 SELECT t.id, s.id, version FROM inventories_tmp t
 left join sets s on t.set_num = s.set_num;
@@ -53,46 +56,57 @@ SELECT i.id, invs.id FROM inventory_sets invs
 left join sets s on invs.set_id = s.id
 left join inventories_tmp i on s.set_num = i.set_num;
 
-create view v_total_quantities as
-select * 
-from (select part_id, color_id, quantity
-from (select part_id, color_id, sum(quantity) as quantity
-from (select * from (select * from inventories where set_id is not null) i
+
+create view v_latest_inventory as
+select i.id from (select * from inventories where set_id is not null) i
 left join (select set_id, max(version) as max_version from inventories group by set_id) as max_i on i.set_id = max_i.set_id and i.version = max_i.max_version
-left join inventory_parts ip on i.id = ip.inventory_id
-where max_i.set_id is not null)
-group by part_id, color_id
+where max_i.set_id is not null
 union all
-select ip.part_id, ip.color_id, sum(ip.quantity * im.quantity) as quantity from minifig_inventory_rel mir
+select mir.inventory_id from minifig_inventory_rel mir
 left join inventories i on i.id = mir.inventory_id
 left join inventory_minifigs im on im.id = mir.inventory_minifig_id
-left join inventory_parts ip on i.id = ip.inventory_id
 left join (select im.fig_id, max(i.version) as max_version from minifig_inventory_rel mir
 left join inventories i on i.id = mir.inventory_id
 left join inventory_minifigs im on im.id = mir.inventory_minifig_id
-group by im.fig_id) as im_max on im_max.fig_id = im.fig_id and im_max.max_version = i.version
+group by im.fig_id) as im_max on im_max.fig_id = im.fig_id and im_max.max_version = i.version;
+
+
+UPDATE inventories SET is_latest = 1 WHERE inventories.id IN (SELECT id FROM v_latest_inventory);
+UPDATE inventories SET is_latest = 0 WHERE inventories.id NOT IN (SELECT id FROM v_latest_inventory);
+
+create view v_total_quantities as
+select part_id, color_id, sum(quantity) as quantity
+from (select ip.part_id, ip.color_id, sum(ip.quantity) as quantity
+from (select * from inventories where is_latest = 1 and set_id is not null) i
+left join inventory_parts ip on i.id = ip.inventory_id
+group by ip.part_id, ip.color_id
+union all
+select ip.part_id, ip.color_id, sum(ip.quantity * im.quantity) as quantity from minifig_inventory_rel mir
+left join (select * from inventories where is_latest = 1 and set_id is null) i on i.id = mir.inventory_id
+left join inventory_minifigs im on im.id = mir.inventory_minifig_id
+left join inventory_parts ip on i.id = ip.inventory_id
 group by ip.part_id, ip.color_id)
-group by part_id, color_id)
-where part_id is not null;
+group by part_id, color_id;
 
 
-UPDATE elements
+UPDATE part_color_frequencies
 SET
       total_amount = (SELECT v_total_quantities.quantity 
                             FROM v_total_quantities
-                            WHERE v_total_quantities.part_id = elements.part_id AND 
-							v_total_quantities.color_id = elements.color_id)
+                            WHERE v_total_quantities.part_id = part_color_frequencies.part_id AND 
+							v_total_quantities.color_id = part_color_frequencies.color_id)
 
 WHERE
     EXISTS (
         SELECT *
         FROM v_total_quantities
-        WHERE v_total_quantities.part_id = elements.part_id AND 
-							v_total_quantities.color_id = elements.color_id
+        WHERE v_total_quantities.part_id = part_color_frequencies.part_id AND 
+							v_total_quantities.color_id = part_color_frequencies.color_id
     );
 
 
 drop view v_total_quantities;
+drop view v_latest_inventory;
 
 
 drop table colors_tmp;

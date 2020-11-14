@@ -13,6 +13,7 @@ from models.inventory import (
 )
 from models.minifig import MinifigModel
 from models.part import PartModel 
+from models.score import ScoreModel
 from models.set import SetModel
 from models.theme import ThemeModel
 
@@ -35,6 +36,7 @@ if __name__ == '__main__':
     manager.create_api(InventoryModel)
     manager.create_api(MinifigModel)
     manager.create_api(PartModel)
+    manager.create_api(ScoreModel)
     manager.create_api(SetModel)
     manager.create_api(ThemeModel)
     app.run(port=5000, debug=True)

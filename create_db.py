@@ -74,6 +74,11 @@ Score.__table__.create(engine)
 Property.__table__.create(engine)
 
 sql = ''
+
+sql += 'ALTER TABLE sets ADD COLUMN eol STRING(1) NOT NULL DEFAULT -1;\n'
+sql += 'ALTER TABLE sets ADD COLUMN retail_price INTEGER;\n'
+sql += 'ALTER TABLE inventory_parts ADD COLUMN total_quantity INTEGER;\n'
+
 sql += 'CREATE INDEX "inv_index" ON "inventories" ("set_num", "version");\n'
 sql += 'CREATE INDEX "inv_parts_index" ON "inventory_parts" ("part_num", "color_id", "is_spare");\n'
 sql += 'CREATE INDEX "inv_parts_index_2" ON "inventory_parts" ("inventory_id", "part_num", "color_id");\n'

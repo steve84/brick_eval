@@ -10,17 +10,31 @@ from models.set import SetModel
 
 
 set_inventory_rel = db.Table('set_inventory_rel',
-                             db.Column('inventory_set_id', db.Integer, db.ForeignKey(
-                                 'inventory_sets.id'), primary_key=True),
-                             db.Column('inventory_id', db.Integer, db.ForeignKey(
-                                 'inventories.id'), primary_key=True)
+                             db.Column(
+                                 'inventory_set_id',
+                                 db.Integer,
+                                 db.ForeignKey('inventory_sets.id'),
+                                 primary_key=True),
+                             db.Column(
+                                 'inventory_id',
+                                 db.Integer,
+                                 db.ForeignKey('inventories.id'),
+                                 primary_key=True)
                              )
 
 minifig_inventory_rel = db.Table('minifig_inventory_rel',
-                                 db.Column('inventory_minifig_id', db.Integer, db.ForeignKey(
-                                     'inventory_minifigs.id'), primary_key=True),
-                                 db.Column('inventory_id', db.Integer, db.ForeignKey(
-                                     'inventories.id'), primary_key=True)
+                                 db.Column(
+                                           'inventory_minifig_id',
+                                           db.Integer,
+                                           db.ForeignKey(
+                                               'inventory_minifigs.id'
+                                            ),
+                                           primary_key=True),
+                                 db.Column(
+                                           'inventory_id',
+                                           db.Integer,
+                                           db.ForeignKey('inventories.id'),
+                                           primary_key=True)
                                  )
 
 

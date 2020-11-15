@@ -6,42 +6,71 @@ import time
 
 
 sys.path.insert(0, '../')
-from db import db
-from app import app
+from db import db  # nopep8
+from app import app  # nopep8
 
-from models.set import SetModel
+from models.set import SetModel  # nopep8
 
-parser = argparse.ArgumentParser(description='Get prices and eol state of sets.')
+parser = argparse.ArgumentParser(
+    description='Get prices and eol state of sets.'
+)
 parser.add_argument('--years', dest='years', type=str,
-                   help='comma separated years of publication of the sets')
+                    help='comma separated years of publication of the sets')
 parser.add_argument('--themes', dest='themes', type=str,
-                   help='comma separated theme ids of the sets')
+                    help='comma separated theme ids of the sets')
 parser.add_argument('--eol', dest='eol', type=str,
                     default='-1', help='comma separated eol states')
 parser.add_argument('--max_items', dest='max_items', type=int, default=10,
-                   help='max sets to process')
+                    help='max sets to process')
 
-themes_id = None if parser.parse_args().themes is None else parser.parse_args().themes.split(',')
-years = None if parser.parse_args().years is None else parser.parse_args().years.split(',')
-eol = None if parser.parse_args().eol is None else parser.parse_args().eol.split(',')
+themes_id = None if parser.parse_args(
+).themes is None else parser.parse_args().themes.split(',')
+years = None if parser.parse_args(
+).years is None else parser.parse_args().years.split(',')
+eol = None if parser.parse_args(
+).eol is None else parser.parse_args().eol.split(',')
 max_items = parser.parse_args().max_items
 
 headers = {
     'x-locale': 'de-CH',
     'content-type': 'application/json',
-    'user-agent' : 'Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.122 Safari/537.36'
+    'user-agent': ('Mozilla/5.0 (Windows NT 6.3; Win64; x64) '
+                   'AppleWebKit/537.36 (KHTML, like Gecko) '
+                   'Chrome/81.0.4044.122 Safari/537.36')
 }
 
-data = json.loads('{"operationName":"SearchSuggestions","variables":{"query":"75255","visibility":{"includeRetiredProducts":true}},"query":"query SearchSuggestions($query: String\\u0021, $suggestionLimit: Int, $productLimit: Int, $visibility: ProductVisibility) { searchSuggestions(query: $query, suggestionLimit: $suggestionLimit, productLimit: $productLimit, visibility: $visibility) { __typename ... on Product { ...Header_Product_ProductSuggestion __typename } ... on SearchSuggestion { text __typename } }}fragment Header_Product_ProductSuggestion on Product { id productCode name slug primaryImage(size: THUMBNAIL) overrideUrl ... on SingleVariantProduct { variant { ...Header_Variant_ProductSuggestion __typename } __typename } ... on MultiVariantProduct { variants { ...Header_Variant_ProductSuggestion __typename } __typename } ... on ReadOnlyProduct { readOnlyVariant { attributes { pieceCount ageRange has3DModel __typename } __typename } __typename } __typename}fragment Header_Variant_ProductSuggestion on ProductVariant { id price { formattedAmount centAmount __typename } __typename}"}')
+data = json.loads(
+    ('{"operationName":"SearchSuggestions",'
+     '"variables":{"query":"75255",'
+     '"visibility":{"includeRetiredProducts":true}},'
+     '"query":"query SearchSuggestions($query: String\\u0021, '
+     '$suggestionLimit: Int, $productLimit: Int, '
+     '$visibility: ProductVisibility) { searchSuggestions(query: $query, '
+     'suggestionLimit: $suggestionLimit, productLimit: $productLimit, '
+     'visibility: $visibility) { __typename ... on Product '
+     '{ ...Header_Product_ProductSuggestion __typename } ... '
+     'on SearchSuggestion { text __typename } }}fragment '
+     'Header_Product_ProductSuggestion on Product { id productCode name '
+     'slug primaryImage(size: THUMBNAIL) overrideUrl ... on '
+     'SingleVariantProduct { variant { ...Header_Variant_ProductSuggestion '
+     '__typename } __typename } ... on MultiVariantProduct { variants { '
+     '...Header_Variant_ProductSuggestion __typename } __typename } ... '
+     'on ReadOnlyProduct { readOnlyVariant { attributes { pieceCount '
+     'ageRange has3DModel __typename } __typename } __typename } __typename}'
+     'fragment Header_Variant_ProductSuggestion on ProductVariant { id price '
+     '{ formattedAmount centAmount __typename } __typename}"}')
+)
 
 s = requests.Session()
 
 add_filters = tuple()
-add_filters += (SetModel.retail_price == None,)
+add_filters += (SetModel.retail_price == None,)  # nopep8
 if years is not None:
-    add_filters += (SetModel.year_of_publication.in_([y for y in map(lambda x: int(x), years)]),)
+    add_filters += (SetModel.year_of_publication.in_(
+        [y for y in map(lambda x: int(x), years)]),)
 if themes_id is not None:
-    add_filters += (SetModel.theme_id.in_([t for t in map(lambda x: int(x), themes_id)]),)
+    add_filters += (SetModel.theme_id.in_(
+        [t for t in map(lambda x: int(x), themes_id)]),)
 if eol is not None:
     add_filters += (SetModel.eol.in_([e for e in map(lambda x: str(x), eol)]),)
 
@@ -58,11 +87,20 @@ with app.app_context():
                 time.sleep(10)
             setnr = setrow.set_num.split('-')[0]
             data['variables']['query'] = setnr
-            response = s.post('https://www.lego.com/api/graphql/SearchSuggestions', headers=headers, json=data)
+            response = s.post(
+                'https://www.lego.com/api/graphql/SearchSuggestions',
+                headers=headers,
+                json=data
+            )
             json_resp = response.json()
-            if 'data' in json_resp.keys() and 'searchSuggestions' in json_resp['data'].keys() and json_resp['data']['searchSuggestions'] is not None and len(json_resp['data']['searchSuggestions']) == 1:
+            if ('data' in json_resp.keys() and
+                    'searchSuggestions' in json_resp['data'].keys() and
+                    json_resp['data']['searchSuggestions'] is not None and
+                    len(json_resp['data']['searchSuggestions']) == 1):
                 set_data = json_resp['data']['searchSuggestions'][0]
-                if 'productCode' in set_data.keys() and 'variant' in set_data.keys() and set_data['productCode'] == setnr:
+                if ('productCode' in set_data.keys() and
+                        'variant' in set_data.keys() and
+                        set_data['productCode'] == setnr):
                     price = set_data['variant']['price']['centAmount']
                     print('%s: %d' % (setrow.set_num, price))
                     setrow.retail_price = int(price)
@@ -73,7 +111,5 @@ with app.app_context():
                 setrow.eol = '0'
             i += 1
 
-
     db.session.commit()
     db.session.close()
-

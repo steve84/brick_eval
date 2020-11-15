@@ -33,12 +33,17 @@ for csv_file in csv_files:
 
     # fix problem in themes data
     if table_name == 'themes':
-        df['parent_id'] = df['parent_id'].where(pd.notnull(df['parent_id']), None)
-   
+        df['parent_id'] = df['parent_id'].where(
+            pd.notnull(df['parent_id']),
+            None)
+
     table_name += '_tmp'
     print("Create table '{}'".format(table_name))
     # create table model
-    table = Table(df.to_dict(orient='records'), table_name=table_name, varying_length_text=True)
+    table = Table(
+        df.to_dict(orient='records'),
+        table_name=table_name,
+        varying_length_text=True)
     # generate sql script
     sql = table.sql('sqlite', inserts=True)
     # avoid multiple insert statements for sqlite
@@ -50,4 +55,3 @@ for csv_file in csv_files:
 
 
 db.close()
-

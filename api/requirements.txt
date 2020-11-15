@@ -4,3 +4,6 @@ Flask-SQLAlchemy
 marshmallow
 marshmallow-SQLAlchemy
 Flask-marshmallow
+pycodestyle
+autopep8
+rope

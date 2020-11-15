@@ -47,7 +47,10 @@ class PartModel(db.Model):
 class PartColorFrequencyModel(db.Model):
     __tablename__ = 'part_color_frequencies'
     __table_args__ = (
-        db.UniqueConstraint('color_id', 'part_id', name='part_color_freq_index'),
+        db.UniqueConstraint(
+            'color_id',
+            'part_id',
+            name='part_color_freq_index'),
     )
 
     id = Column(Integer, primary_key=True)

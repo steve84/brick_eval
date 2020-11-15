@@ -12,7 +12,7 @@ from models.inventory import (
     InventorySetModel
 )
 from models.minifig import MinifigModel
-from models.part import PartModel 
+from models.part import PartModel
 from models.score import ScoreModel
 from models.set import SetModel
 from models.theme import ThemeModel
@@ -22,6 +22,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///rebrickable_new.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PROPAGATE_EXCEPTIONS'] = True
 app.secret_key = 'brick_eval'
+
 
 @app.before_first_request
 def create_tables():

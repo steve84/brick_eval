@@ -4,6 +4,9 @@ Flask-SQLAlchemy
 marshmallow
 marshmallow-SQLAlchemy
 Flask-marshmallow
+Flask-restless
+pandas
+ddlgenerator
 pycodestyle
 autopep8
 rope

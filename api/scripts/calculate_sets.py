@@ -67,17 +67,12 @@ def processInventory(session, inventory_id, max_amount):
     score = calcScore(session, max_amount, parts)
 
     print('Set %d has a score of: %f' % (inventory_id, score))
-    if actual_score:
-        # update
-        actual_score.score = score
-        actual_score.calc_date = func.current_date()
-    else:
-        # insert
-        session.add(ScoreModel(
-            inventory_id=inventory_id,
-            score=score,
-            calc_date=func.current_date()
-        ))
+    # insert
+    session.add(ScoreModel(
+        inventory_id=inventory_id,
+        score=score,
+        calc_date=func.current_date()
+    ))
 
 
 db.init_app(app)
@@ -194,4 +189,3 @@ with app.app_context():
 
         db.session.commit()
         i += 1
-

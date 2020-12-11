@@ -46,6 +46,11 @@ class InventoryModel(db.Model):
     version = Column(Integer, nullable=False)
     is_latest = Column(Boolean, nullable=False, server_default='1')
 
+    set = db.relationship('SetModel',
+                          lazy='subquery',
+                          backref=db.backref('inventories',
+                                             lazy=True))
+
     inventory_sets = db.relationship('InventorySetModel',
                                      secondary=set_inventory_rel,
                                      lazy='subquery',

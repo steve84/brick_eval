@@ -17,6 +17,8 @@ from models.score import ScoreModel
 from models.set import SetModel
 from models.theme import ThemeModel
 
+from resources.theme import theme_bp
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///rebrickable_new.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -35,9 +37,12 @@ if __name__ == '__main__':
     manager.create_api(ColorModel)
     manager.create_api(ElementModel)
     manager.create_api(InventoryModel)
+    manager.create_api(InventoryMinifigModel)
+    manager.create_api(InventoryPartModel)
     manager.create_api(MinifigModel)
     manager.create_api(PartModel)
     manager.create_api(ScoreModel)
     manager.create_api(SetModel)
     manager.create_api(ThemeModel)
-    app.run(port=5000, debug=True)
+    manager.app.register_blueprint(theme_bp)
+    app.run(port=5000, host='0.0.0.0', debug=True)

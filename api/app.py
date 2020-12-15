@@ -12,7 +12,10 @@ from models.inventory import (
     InventorySetModel
 )
 from models.minifig import MinifigModel
-from models.part import PartModel
+from models.part import (
+    PartModel,
+    PartColorFrequencyModel
+)
 from models.score import ScoreModel
 from models.set import SetModel
 from models.theme import ThemeModel
@@ -41,6 +44,7 @@ if __name__ == '__main__':
     manager.create_api(InventoryPartModel)
     manager.create_api(MinifigModel)
     manager.create_api(PartModel)
+    manager.create_api(PartColorFrequencyModel)
     manager.create_api(ScoreModel)
     manager.create_api(SetModel)
     manager.create_api(ThemeModel)

@@ -100,6 +100,7 @@ class InventoryPartModel(db.Model):
 
     color = db.relationship('ColorModel')
     part = db.relationship('PartModel')
+    part_color_frequency = db.relationship('PartColorFrequencyModel', primaryjoin="and_(InventoryPartModel.color_id==PartColorFrequencyModel.color_id, InventoryPartModel.part_id==PartColorFrequencyModel.part_id)")
 
 
 class InventorySetModel(db.Model):

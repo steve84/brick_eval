@@ -27,7 +27,7 @@ minifig_inventory_rel = db.Table('minifig_inventory_rel',
                                            'inventory_minifig_id',
                                            db.Integer,
                                            db.ForeignKey(
-                                               'inventory_minifigs.id'
+                                               'v_inventory_minifigs.id'
                                             ),
                                            primary_key=True),
                                  db.Column(
@@ -42,7 +42,7 @@ class InventoryModel(db.Model):
     __tablename__ = 'inventories'
 
     id = Column(Integer, primary_key=True)
-    set_id = Column(Integer, db.ForeignKey('sets.id'))
+    set_id = Column(Integer, db.ForeignKey('v_sets.id'))
     version = Column(Integer, nullable=False)
     is_latest = Column(Boolean, nullable=False, server_default='1')
 
@@ -65,7 +65,7 @@ class InventoryModel(db.Model):
 
 
 class InventoryMinifigModel(db.Model):
-    __tablename__ = 'inventory_minifigs'
+    __tablename__ = 'v_inventory_minifigs'
     __table_args__ = (
         db.Index('inventory_minifig_index',
                  'inventory_id', 'fig_id', unique=True),
@@ -76,8 +76,10 @@ class InventoryMinifigModel(db.Model):
         'inventories.id'), nullable=False)
     fig_id = Column(Integer, db.ForeignKey('minifigs.id'), nullable=False)
     quantity = Column(Integer, nullable=False)
+    score_id = Column(Integer, db.ForeignKey('scores.id'))
 
     minifig = db.relationship('MinifigModel')
+    score = db.relationship('ScoreModel')
 
 
 class InventoryPartModel(db.Model):
@@ -101,6 +103,7 @@ class InventoryPartModel(db.Model):
     color = db.relationship('ColorModel')
     part = db.relationship('PartModel')
     part_color_frequency = db.relationship('PartColorFrequencyModel', primaryjoin="and_(InventoryPartModel.color_id==PartColorFrequencyModel.color_id, InventoryPartModel.part_id==PartColorFrequencyModel.part_id)")
+    element = db.relationship('ElementModel', primaryjoin="and_(InventoryPartModel.color_id==ElementModel.color_id, InventoryPartModel.part_id==ElementModel.part_id)")
 
 
 class InventorySetModel(db.Model):
@@ -112,7 +115,7 @@ class InventorySetModel(db.Model):
     id = Column(Integer, primary_key=True)
     inventory_id = Column(Integer, db.ForeignKey(
         'inventories.id'), nullable=False)
-    set_id = Column(Integer, db.ForeignKey('sets.id'), nullable=False)
+    set_id = Column(Integer, db.ForeignKey('v_sets.id'), nullable=False)
     quantity = Column(Integer, nullable=False)
 
     set = db.relationship('SetModel')

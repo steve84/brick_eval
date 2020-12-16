@@ -10,7 +10,7 @@ from models.theme import ThemeModel
 
 
 class SetModel(db.Model):
-    __tablename__ = 'sets'
+    __tablename__ = 'v_sets'
 
     id = Column(Integer, primary_key=True)
     set_num = Column(Text, nullable=False, unique=True)
@@ -20,8 +20,10 @@ class SetModel(db.Model):
     num_parts = Column(Integer, nullable=False)
     eol = Column(String(1), nullable=False, server_default='-1')
     retail_price = Column(Integer)
+    score_id = Column(Integer, db.ForeignKey('scores.id'))
 
     theme = db.relationship('ThemeModel')
+    score = db.relationship('ScoreModel')
 
     @classmethod
     def find_by_set_num(cls, set_num):

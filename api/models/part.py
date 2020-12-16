@@ -58,6 +58,6 @@ class PartColorFrequencyModel(db.Model):
     )
 
     id = Column(Integer, primary_key=True)
-    part_id = Column(Integer, nullable=False)
-    color_id = Column(Integer, nullable=False)
+    part_id = Column(Integer, db.ForeignKey('parts.id'), nullable=False)
+    color_id = Column(Integer, db.ForeignKey('colors.id'), nullable=False)
     total_amount = Column(Integer, nullable=False, server_default='0')

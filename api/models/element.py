@@ -12,6 +12,10 @@ class ElementModel(db.Model):
     __table_args__ = (
         db.Index('element_index', 'element_id',
                  'part_id', 'color_id', unique=True),
+        db.ForeignKeyConstraint(
+            ['part_id', 'color_id'],
+            ['inventory_parts.part_id', 'inventory_parts.color_id']
+        ),
     )
 
     id = Column(Integer, primary_key=True)

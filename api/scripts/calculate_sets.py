@@ -127,65 +127,53 @@ with app.app_context():
             [e for e in map(lambda x: str(x), eol)]),)
 
     sets_to_check = db.session.query(
-        SetModel.set_num
+        SetModel.id
     ).filter(*add_filters).distinct()
-    sets_with_score = db.session.query(ScoreModel.inventory_id).distinct()
+    sets_with_score = db.session.query(ScoreModel.inventory_id).filter(
+        ScoreModel.calc_date >= due_date
+    ).distinct()
 
     sets_to_calc = db.session.query(InventoryModel.id).filter(and_(
         InventoryModel.is_latest,
-        InventoryModel.set_id,
+        InventoryModel.set_id.in_(sets_to_check),
         InventoryModel.id.notin_(sets_with_score)
     )).limit(max_inventories).all()
 
-    if len(sets_to_calc) < max_inventories:
-        sets_to_calc += db.session.query(InventoryModel.id).join(
+    for inventory_set in sets_to_calc:
+        processInventory(
+            db.session, inventory_set.id, max_amount
+        )
+
+        inventories_fig = db.session.query(
+            InventoryMinifigModel.id
+        ).filter(
+            InventoryMinifigModel.inventory_id == inventory_set.id
+        )
+
+        inventory_candidates = db.session.query(
+            minifig_inventory_rel.c.inventory_id
+        ).filter(
+            minifig_inventory_rel.c.inventory_minifig_id.in_(
+                inventories_fig
+            )
+        )
+
+        # Works only with ScoreModel.id == None
+        # Does not work ScoreModel.id is None
+        fig_inventories = db.session.query(InventoryModel.id).join(
             ScoreModel,
             ScoreModel.inventory_id == InventoryModel.id,
             isouter=True
         ).filter(and_(
             InventoryModel.is_latest,
-            InventoryModel.set_id,
-            ScoreModel.calc_date < due_date
-        )).limit(max_inventories - len(sets_to_calc)).all()
+            InventoryModel.id.in_(inventory_candidates),
+            or_(ScoreModel.id == None, ScoreModel.calc_date < due_date)
+        )).all()  # nopep8
 
-    i = 0
-    for inventory_set in sets_to_calc:
-        if i < max_inventories:
+        for inventory_minifig in fig_inventories:
             processInventory(
-                db.session, inventory_set.id, max_amount
+                db.session, inventory_minifig.id,
+                max_amount
             )
-
-            inventories_fig = db.session.query(
-                InventoryMinifigModel.id
-            ).filter(
-                InventoryMinifigModel.inventory_id == inventory_set.id
-            )
-
-            inventory_candidates = db.session.query(
-                minifig_inventory_rel.c.inventory_id
-            ).filter(
-                minifig_inventory_rel.c.inventory_minifig_id.in_(
-                    inventories_fig
-                )
-            )
-
-            # Works only with ScoreModel.id == None
-            # Does not work ScoreModel.id is None
-            fig_inventories = db.session.query(InventoryModel.id).join(
-                ScoreModel,
-                ScoreModel.inventory_id == InventoryModel.id,
-                isouter=True
-            ).filter(and_(
-                InventoryModel.is_latest,
-                InventoryModel.id.in_(inventory_candidates),
-                or_(ScoreModel.id == None, ScoreModel.calc_date < due_date)
-            )).all()  # nopep8
-
-            for inventory_minifig in fig_inventories:
-                processInventory(
-                    db.session, inventory_minifig.id,
-                    max_amount
-                )
 
         db.session.commit()
-        i += 1

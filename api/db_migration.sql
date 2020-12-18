@@ -1,3 +1,48 @@
+-- Create tmp tables to store generated data --
+create table tmp_sets_info (
+	set_num TEXT NOT NULL UNIQUE,
+	eol VARCHAR(1) DEFAULT -1,
+	retail_price INTEGER
+);
+
+create table tmp_scores (
+	set_num TEXT,
+	fig_num TEXT,
+	score FLOAT NOT NULL,
+	calc_date DATE NOT NULL
+);
+
+create table tmp_scores_with_id (
+	inventory_id INTEGER NOT NULL,
+	score FLOAT NOT NULL,
+	calc_date DATE NOT NULL
+);
+
+-- Insert generated data into tmp tables
+insert into tmp_sets_info
+select set_num, eol, retail_price from sets where retail_price is not null or eol <> -1;
+
+insert into tmp_scores
+select distinct s.set_num, m.fig_num, sc.score, sc.calc_date from scores sc
+left join inventories i on sc.inventory_id = i.id
+left join minifig_inventory_rel mir on i.id = mir.inventory_id
+left join inventory_minifigs im on mir.inventory_minifig_id = im.id
+left join sets s on i.set_id = s.id
+left join minifigs m on im.fig_id = m.id;
+
+insert into tmp_scores_with_id
+select i.id as inventory_id, tsc.score, tsc.calc_date from tmp_scores tsc
+left join sets s on s.set_num = tsc.set_num
+left join inventories i on i.set_id = s.id and i.is_latest = 1
+where tsc.set_num is not null
+union all
+select distinct i.id as inventory_id, tsc.score, tsc.calc_date from tmp_scores tsc
+left join minifigs m on m.fig_num = tsc.fig_num
+left join inventory_minifigs im on im.fig_id = m.id
+left join minifig_inventory_rel mir on mir.inventory_minifig_id = im.id
+left join inventories i on i.id = mir.inventory_id and i.is_latest = 1
+where tsc.fig_num is not null;
+
 -- Delete queries --
 PRAGMA foreign_keys = OFF;
 DELETE FROM colors WHERE id NOT NULL;
@@ -92,7 +137,6 @@ select c.amount = ct.amount from (select count(*) as amount from inventory_parts
 
 
 -- Generated from base tables
-
 INSERT OR IGNORE INTO part_color_frequencies (part_id, color_id)
 SELECT part_id, color_id FROM inventory_parts;
 
@@ -162,6 +206,22 @@ WHERE
 drop view v_total_quantities;
 drop view v_latest_inventory;
 
+-- Update generated data --
+UPDATE sets
+SET
+      (eol, retail_price) = (SELECT tmp_sets_info.eol, tmp_sets_info.retail_price
+                            FROM tmp_sets_info
+                            WHERE tmp_sets_info.set_num = sets.set_num)
+WHERE
+    EXISTS (
+        SELECT *
+        FROM tmp_sets_info
+        WHERE tmp_sets_info.set_num = sets.set_num
+    );
+
+insert into scores
+select rowid as id, inventory_id, score, calc_date from tmp_scores_with_id;
+
 
 drop table colors_tmp;
 drop table elements_tmp;
@@ -175,3 +235,6 @@ drop table part_relationships_tmp;
 drop table parts_tmp;
 drop table sets_tmp;
 drop table themes_tmp;
+drop table tmp_sets_info;
+drop table tmp_scores;
+drop table tmp_scores_with_id;

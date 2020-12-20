@@ -1,34 +1,58 @@
+import gzip
+import os
 import re
 import sqlite3
+import shutil
+import subprocess
 import pandas as pd
+
+from datetime import datetime
 
 from ddlgenerator.ddlgenerator import Table
 
 
-csv_files = [
-    'exports/colors.csv',
-    'exports/elements.csv',
-    'exports/inventories.csv',
-    'exports/inventory_minifigs.csv',
-    'exports/inventory_parts.csv',
-    'exports/inventory_sets.csv',
-    'exports/minifigs.csv',
-    'exports/part_categories.csv',
-    'exports/part_relationships.csv',
-    'exports/parts.csv',
-    'exports/sets.csv',
-    'exports/themes.csv'
+export_dir = 'test_exports/'
+old_export_dir = 'test_exports_old/'
+
+if not os.path.exists(export_dir) or not os.path.isdir(export_dir):
+    os.mkdir(export_dir)
+
+if not os.path.exists(old_export_dir) or not os.path.isdir(old_export_dir):
+    os.mkdir(old_export_dir)
+
+
+for f in os.listdir(export_dir):
+    src_full_path = '%s%s' % (export_dir, f)
+    trgt_full_path = '%s%s' % (old_export_dir, f)
+    src_creation_date = datetime.utcfromtimestamp(
+        os.path.getctime(src_full_path)
+    )
+    src_creation_date_str = str(src_creation_date.date())
+    src_creation_date_str = src_creation_date_str.replace('-', '_')
+    trgt_name = '%s.%s' % (trgt_full_path, src_creation_date_str)
+    shutil.copy2(src_full_path, trgt_name)
+    os.remove(src_full_path)
+
+subprocess.run([
+    'curl',
+    'https://rebrickable.com/media/downloads/{colors,elements,inventories,inventory_minifigs,inventory_parts,inventory_sets,minifigs,part_categories,part_relationships,parts,sets,themes}.csv.gz',
+    '-o',
+    '%s#1.csv.gz' % export_dir])
+
+
+gz_files = [
+    '%s%s' % (export_dir, gz_file) for gz_file in os.listdir(export_dir)
 ]
 
 db_file = 'api/rebrickable_new.db'
 db = sqlite3.connect(db_file)
 
-for csv_file in csv_files:
+for gz_file in gz_files:
     # define table name
-    file_name = csv_file.split('exports/')[1]
+    file_name = gz_file.split('exports/')[1]
     table_name = file_name.split('.')[0]
     # read csv
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(gzip.open(gz_file))
     df = df.rename(columns={'year': 'year_of_publication'})
 
     # fix problem in themes data

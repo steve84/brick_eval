@@ -10,7 +10,7 @@ from models.theme import ThemeModel
 
 
 class SetModel(db.Model):
-    __tablename__ = 'v_sets'
+    __tablename__ = 'sets'
 
     id = Column(Integer, primary_key=True)
     set_num = Column(Text, nullable=False, unique=True)
@@ -24,11 +24,3 @@ class SetModel(db.Model):
 
     theme = db.relationship('ThemeModel')
     score = db.relationship('ScoreModel')
-
-    @classmethod
-    def find_by_set_num(cls, set_num):
-        return cls.query.filter(cls.set_num == set_num).first()
-
-    @classmethod
-    def find_all_by_eol(cls, eol):
-        return cls.query.filter(cls.eol == eol).all()

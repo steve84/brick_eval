@@ -16,7 +16,7 @@ from models.inventory import (
     InventoryModel,
     InventoryPartModel,
     InventoryMinifigModel,
-    minifig_inventory_rel
+    MinifigInventoryRelation
 )  # nopep8
 from models.part import PartColorFrequencyModel  # nopep8
 from models.score import ScoreModel  # nopep8
@@ -64,15 +64,13 @@ def processInventory(session, inventory_id, max_amount):
         InventoryPartModel.inventory_id == inventory_id
     ).all()
 
-    score = calcScore(session, max_amount, parts)
+    score = ScoreModel(inventory_id=inventory_id,
+                       score=calcScore(session, max_amount, parts),
+                       calc_date=func.current_date())
 
-    print('Set %d has a score of: %f' % (inventory_id, score))
+    print('Set %d has a score of: %f' % (inventory_id, score.score))
     # insert
-    session.add(ScoreModel(
-        inventory_id=inventory_id,
-        score=score,
-        calc_date=func.current_date()
-    ))
+    session.add(score)
 
 
 db.init_app(app)
@@ -151,9 +149,9 @@ with app.app_context():
         )
 
         inventory_candidates = db.session.query(
-            minifig_inventory_rel.c.inventory_id
+            MinifigInventoryRelation.inventory_id
         ).filter(
-            minifig_inventory_rel.c.inventory_minifig_id.in_(
+            MinifigInventoryRelation.inventory_minifig_id.in_(
                 inventories_fig
             )
         )
@@ -177,3 +175,45 @@ with app.app_context():
             )
 
         db.session.commit()
+
+    sql = """
+        DROP VIEW IF EXISTS v_sets_scores;
+        CREATE VIEW v_sets_scores AS
+            SELECT DISTINCT s.id AS set_id, sc.id AS score_id FROM (
+                SELECT * FROM scores
+                GROUP BY inventory_id
+                HAVING MAX(calc_date)
+            ) SC
+            LEFT JOIN inventories i ON sc.inventory_id = i.id
+            LEFT JOIN sets s ON i.set_id = s.id
+            WHERE s.id IS NOT NULL;
+        UPDATE sets SET score_id = (
+            SELECT score_id FROM v_sets_scores
+            WHERE v_sets_scores.set_id = sets.id
+        );
+        DROP VIEW v_sets_scores;
+        """
+
+    sql += """
+        DROP VIEW IF EXISTS v_inventory_minifigs_scores;
+        CREATE VIEW v_inventory_minifigs_scores AS
+            SELECT DISTINCT im.id AS minifig_id, sc.id AS score_id FROM (
+                SELECT * FROM scores
+                GROUP BY inventory_id
+                HAVING MAX(calc_date)
+            ) SC
+            LEFT JOIN inventories i ON sc.inventory_id = i.id
+            LEFT JOIN minifig_inventory_rel mir ON i.id = mir.inventory_id
+            LEFT JOIN inventory_minifigs im ON mir.inventory_minifig_id = im.id
+            WHERE im.id IS NOT NULL;
+        UPDATE inventory_minifigs SET score_id = (
+            SELECT score_id FROM v_inventory_minifigs_scores WHERE
+            v_inventory_minifigs_scores.minifig_id = inventory_minifigs.id
+        );
+        DROP VIEW v_inventory_minifigs_scores;
+        """
+
+    conn = db.session.connection().connection
+    cursor = conn.cursor()
+    cursor.executescript(sql)
+    db.session.commit()

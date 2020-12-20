@@ -1,47 +1,32 @@
+-- Generate base tmp tables by executing create_tmp_tables.py
+
 -- Create tmp tables to store generated data --
-create table tmp_sets_info (
+CREATE TABLE tmp_sets_info (
 	set_num TEXT NOT NULL UNIQUE,
 	eol VARCHAR(1) DEFAULT -1,
 	retail_price INTEGER
 );
 
-create table tmp_scores (
+CREATE TABLE tmp_scores (
 	set_num TEXT,
 	fig_num TEXT,
 	score FLOAT NOT NULL,
 	calc_date DATE NOT NULL
 );
 
-create table tmp_scores_with_id (
-	inventory_id INTEGER NOT NULL,
-	score FLOAT NOT NULL,
-	calc_date DATE NOT NULL
-);
 
 -- Insert generated data into tmp tables
-insert into tmp_sets_info
-select set_num, eol, retail_price from sets where retail_price is not null or eol <> -1;
+INSERT INTO tmp_sets_info
+SELECT set_num, eol, retail_price FROM sets WHERE retail_price IS NOT NULL OR eol <> -1;
 
-insert into tmp_scores
-select distinct s.set_num, m.fig_num, sc.score, sc.calc_date from scores sc
-left join inventories i on sc.inventory_id = i.id
-left join minifig_inventory_rel mir on i.id = mir.inventory_id
-left join inventory_minifigs im on mir.inventory_minifig_id = im.id
-left join sets s on i.set_id = s.id
-left join minifigs m on im.fig_id = m.id;
+INSERT INTO tmp_scores
+SELECT DISTINCT s.set_num, m.fig_num, sc.score, sc.calc_date FROM scores sc
+LEFT JOIN inventories i ON sc.inventory_id = i.id
+LEFT JOIN minifig_inventory_rel mir ON i.id = mir.inventory_id
+LEFT JOIN inventory_minifigs im ON mir.inventory_minifig_id = im.id
+LEFT JOIN sets s ON i.set_id = s.id
+LEFT JOIN minifigs m ON im.fig_id = m.id;
 
-insert into tmp_scores_with_id
-select i.id as inventory_id, tsc.score, tsc.calc_date from tmp_scores tsc
-left join sets s on s.set_num = tsc.set_num
-left join inventories i on i.set_id = s.id and i.is_latest = 1
-where tsc.set_num is not null
-union all
-select distinct i.id as inventory_id, tsc.score, tsc.calc_date from tmp_scores tsc
-left join minifigs m on m.fig_num = tsc.fig_num
-left join inventory_minifigs im on im.fig_id = m.id
-left join minifig_inventory_rel mir on mir.inventory_minifig_id = im.id
-left join inventories i on i.id = mir.inventory_id and i.is_latest = 1
-where tsc.fig_num is not null;
 
 -- Delete queries --
 PRAGMA foreign_keys = OFF;
@@ -60,6 +45,7 @@ DELETE FROM inventory_sets WHERE inventory_id NOT NULL;
 DELETE FROM inventory_parts WHERE inventory_id NOT NULL;
 DELETE FROM minifig_inventory_rel WHERE inventory_id NOT NULL;
 DELETE FROM set_inventory_rel WHERE inventory_id  NOT NULL;
+DELETE FROM scores WHERE id NOT NULL;
 
 -- Insert queries --
 
@@ -84,87 +70,85 @@ SELECT part_num, name, part_cat_id, part_material FROM parts_tmp;
 
 INSERT OR IGNORE INTO elements (element_id, part_id, color_id)
 SELECT element_id, p.id, color_id FROM elements_tmp e
-left join parts p on e.part_num = p.part_num;
+LEFT JOIN parts p ON e.part_num = p.part_num;
 
 INSERT OR IGNORE INTO inventories (id, set_id, version)
 SELECT t.id, s.id, version FROM inventories_tmp t
-left join sets s on t.set_num = s.set_num;
+LEFT JOIN sets s ON t.set_num = s.set_num;
 
 INSERT OR IGNORE INTO part_relationships (rel_type, child_part_id, parent_part_id)
 SELECT rel_type, p1.id, p2.id FROM part_relationships_tmp t
-left join parts p1 on t.child_part_num = p1.part_num
-left join parts p2 on t.parent_part_num = p2.part_num;
+LEFT JOIN parts p1 ON t.child_part_num = p1.part_num
+LEFT JOIN parts p2 ON t.parent_part_num = p2.part_num;
 
 INSERT OR IGNORE INTO inventory_minifigs (inventory_id, fig_id, quantity)
 SELECT inventory_id, m.id, quantity FROM inventory_minifigs_tmp t
-left join minifigs m on m.fig_num = t.fig_num;
+LEFT JOIN minifigs m ON m.fig_num = t.fig_num;
 
 INSERT OR IGNORE INTO inventory_sets (inventory_id, set_id, quantity)
 SELECT inventory_id, s.id, quantity FROM inventory_sets_tmp t
-left join sets s on s.set_num = t.set_num;
+LEFT JOIN sets s ON s.set_num = t.set_num;
 
 INSERT OR IGNORE INTO inventory_parts (inventory_id, part_id, color_id, is_spare, quantity)
 SELECT inventory_id, p.id, color_id, is_spare, quantity FROM inventory_parts_tmp t
-left join parts p on t.part_num = p.part_num;
-
-DELETE FROM scores WHERE inventory_id NOT IN (select id FROM inventories);
-PRAGMA foreign_keys = ON;
+LEFT JOIN parts p ON t.part_num = p.part_num;
 
 --- Insert check
-select c.amount = ct.amount from (select count(*) as amount from colors) c, (select count(*) as amount from colors_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from minifigs) c, (select count(*) as amount from minifigs_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from part_categories) c, (select count(*) as amount from part_categories_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from themes) c, (select count(*) as amount from themes_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from sets) c, (select count(*) as amount from sets_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from parts) c, (select count(*) as amount from parts_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from elements) c, (select count(*) as amount from elements_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from inventories) c, (select count(*) as amount from inventories_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from part_relationships) c, (select count(*) as amount from part_relationships_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from inventory_minifigs) c, (select count(*) as amount from inventory_minifigs_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from inventory_sets) c, (select count(*) as amount from inventory_sets_tmp) ct
-union all
-select c.amount = ct.amount from (select count(*) as amount from inventory_parts) c, (select count(*) as amount from inventory_parts_tmp) ct;
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM colors) c, (SELECT count(*) AS amount FROM colors_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM minifigs) c, (SELECT count(*) AS amount FROM minifigs_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM part_categories) c, (SELECT count(*) AS amount FROM part_categories_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM themes) c, (SELECT count(*) AS amount FROM themes_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM sets) c, (SELECT count(*) AS amount FROM sets_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM parts) c, (SELECT count(*) AS amount FROM parts_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM elements) c, (SELECT count(*) AS amount FROM elements_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventories) c, (SELECT count(*) AS amount FROM inventories_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM part_relationships) c, (SELECT count(*) AS amount FROM part_relationships_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_minifigs) c, (SELECT count(*) AS amount FROM inventory_minifigs_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_sets) c, (SELECT count(*) AS amount FROM inventory_sets_tmp) ct
+UNION ALL
+SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_parts) c, (SELECT count(*) AS amount FROM inventory_parts_tmp) ct;
 
 
--- Generated from base tables
+-- Generated FROM base tables
 INSERT OR IGNORE INTO part_color_frequencies (part_id, color_id)
-SELECT part_id, color_id FROM inventory_parts;
+SELECT DISTINCT part_id, color_id FROM inventory_parts;
 
 INSERT OR IGNORE INTO minifig_inventory_rel (inventory_id, inventory_minifig_id)
 SELECT i.id, im.id FROM inventory_minifigs im
-left join minifigs m on im.fig_id = m.id
-left join inventories_tmp i on m.fig_num = i.set_num;
+LEFT JOIN minifigs m ON im.fig_id = m.id
+LEFT JOIN inventories_tmp i ON m.fig_num = i.set_num;
 
 INSERT OR IGNORE INTO set_inventory_rel (inventory_id, inventory_set_id)
 SELECT i.id, invs.id FROM inventory_sets invs
-left join sets s on invs.set_id = s.id
-left join inventories_tmp i on s.set_num = i.set_num;
+LEFT JOIN sets s ON invs.set_id = s.id
+LEFT JOIN inventories_tmp i ON s.set_num = i.set_num;
 
+PRAGMA foreign_keys = ON;
 
 -- Update inventories table (is_latest)
 
-create view v_latest_inventory as
-select i.id from (select * from inventories where set_id is not null) i
-left join (select set_id, max(version) as max_version from inventories group by set_id) as max_i on i.set_id = max_i.set_id and i.version = max_i.max_version
-where max_i.set_id is not null
-union all
-select mir.inventory_id from minifig_inventory_rel mir
-left join inventories i on i.id = mir.inventory_id
-left join inventory_minifigs im on im.id = mir.inventory_minifig_id
-left join (select im.fig_id, max(i.version) as max_version from minifig_inventory_rel mir
-left join inventories i on i.id = mir.inventory_id
-left join inventory_minifigs im on im.id = mir.inventory_minifig_id
-group by im.fig_id) as im_max on im_max.fig_id = im.fig_id and im_max.max_version = i.version;
+CREATE VIEW v_latest_inventory as
+SELECT i.id FROM (SELECT * FROM inventories WHERE set_id IS NOT NULL) i
+LEFT JOIN (SELECT set_id, max(version) AS max_version FROM inventories GROUP BY set_id) AS max_i ON i.set_id = max_i.set_id AND i.version = max_i.max_version
+WHERE max_i.set_id IS NOT NULL
+UNION ALL
+SELECT mir.inventory_id FROM minifig_inventory_rel mir
+LEFT JOIN inventories i ON i.id = mir.inventory_id
+LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
+LEFT JOIN (SELECT im.fig_id, max(i.version) AS max_version FROM minifig_inventory_rel mir
+LEFT JOIN inventories i ON i.id = mir.inventory_id
+LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
+GROUP BY im.fig_id) AS im_max ON im_max.fig_id = im.fig_id AND im_max.max_version = i.version;
 
 UPDATE inventories SET is_latest = 1 WHERE inventories.id IN (SELECT id FROM v_latest_inventory);
 UPDATE inventories SET is_latest = 0 WHERE inventories.id NOT IN (SELECT id FROM v_latest_inventory);
@@ -172,19 +156,19 @@ UPDATE inventories SET is_latest = 0 WHERE inventories.id NOT IN (SELECT id FROM
 
 -- Update part_color_frequencies table (quantity)
 
-create view v_total_quantities as
-select part_id, color_id, sum(quantity) as quantity
-from (select ip.part_id, ip.color_id, sum(ip.quantity) as quantity
-from (select * from inventories where is_latest = 1 and set_id is not null) i
-left join inventory_parts ip on i.id = ip.inventory_id
-group by ip.part_id, ip.color_id
-union all
-select ip.part_id, ip.color_id, sum(ip.quantity * im.quantity) as quantity from minifig_inventory_rel mir
-left join (select * from inventories where is_latest = 1 and set_id is null) i on i.id = mir.inventory_id
-left join inventory_minifigs im on im.id = mir.inventory_minifig_id
-left join inventory_parts ip on i.id = ip.inventory_id
-group by ip.part_id, ip.color_id)
-group by part_id, color_id;
+CREATE VIEW v_total_quantities as
+SELECT part_id, color_id, sum(quantity) AS quantity
+FROM (SELECT ip.part_id, ip.color_id, sum(ip.quantity) AS quantity
+FROM (SELECT * FROM inventories WHERE is_latest = 1 AND set_id IS NOT NULL) i
+LEFT JOIN inventory_parts ip ON i.id = ip.inventory_id
+GROUP BY ip.part_id, ip.color_id
+UNION ALL
+SELECT ip.part_id, ip.color_id, sum(ip.quantity * im.quantity) AS quantity FROM minifig_inventory_rel mir
+LEFT JOIN (SELECT * FROM inventories WHERE is_latest = 1 AND set_id is NULL) i ON i.id = mir.inventory_id
+LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
+LEFT JOIN inventory_parts ip ON i.id = ip.inventory_id
+GROUP BY ip.part_id, ip.color_id)
+GROUP BY part_id, color_id;
 
 
 UPDATE part_color_frequencies
@@ -203,8 +187,8 @@ WHERE
     );
 
 
-drop view v_total_quantities;
-drop view v_latest_inventory;
+DROP VIEW v_total_quantities;
+DROP VIEW v_latest_inventory;
 
 -- Update generated data --
 UPDATE sets
@@ -219,22 +203,66 @@ WHERE
         WHERE tmp_sets_info.set_num = sets.set_num
     );
 
-insert into scores
-select rowid as id, inventory_id, score, calc_date from tmp_scores_with_id;
+INSERT INTO scores (inventory_id, score, calc_date)
+SELECT i.id AS inventory_id, tsc.score, tsc.calc_date FROM tmp_scores tsc
+LEFT JOIN sets s ON s.set_num = tsc.set_num
+LEFT JOIN inventories i ON i.set_id = s.id AND i.is_latest = 1
+WHERE tsc.set_num IS NOT NULL
+UNION ALL
+SELECT DISTINCT i.id AS inventory_id, tsc.score, tsc.calc_date FROM tmp_scores tsc
+LEFT JOIN minifigs m ON m.fig_num = tsc.fig_num
+LEFT JOIN inventory_minifigs im ON im.fig_id = m.id
+LEFT JOIN minifig_inventory_rel mir ON mir.inventory_minifig_id = im.id
+LEFT JOIN inventories i ON i.id = mir.inventory_id AND i.is_latest = 1
+WHERE tsc.fig_num IS NOT NULL;
+
+-- Set score ids
+DROP VIEW IF EXISTS v_sets_scores;
+CREATE VIEW v_sets_scores AS
+    SELECT DISTINCT s.id AS set_id, sc.id AS score_id FROM (
+        SELECT * FROM scores
+        GROUP BY inventory_id
+        HAVING MAX(calc_date)
+    ) SC
+    LEFT JOIN inventories i ON sc.inventory_id = i.id
+    LEFT JOIN sets s ON i.set_id = s.id
+    WHERE s.id IS NOT NULL;
+UPDATE sets SET score_id = (
+    SELECT score_id FROM v_sets_scores
+    WHERE v_sets_scores.set_id = sets.id
+);
+DROP VIEW v_sets_scores;
 
 
-drop table colors_tmp;
-drop table elements_tmp;
-drop table inventories_tmp;
-drop table inventory_minifigs_tmp;
-drop table inventory_parts_tmp;
-drop table inventory_sets_tmp;
-drop table minifigs_tmp;
-drop table part_categories_tmp;
-drop table part_relationships_tmp;
-drop table parts_tmp;
-drop table sets_tmp;
-drop table themes_tmp;
-drop table tmp_sets_info;
-drop table tmp_scores;
-drop table tmp_scores_with_id;
+DROP VIEW IF EXISTS v_inventory_minifigs_scores;
+CREATE VIEW v_inventory_minifigs_scores AS
+    SELECT DISTINCT im.id AS minifig_id, sc.id AS score_id FROM (
+        SELECT * FROM scores
+        GROUP BY inventory_id
+        HAVING MAX(calc_date)
+    ) SC
+    LEFT JOIN inventories i ON sc.inventory_id = i.id
+    LEFT JOIN minifig_inventory_rel mir ON i.id = mir.inventory_id
+    LEFT JOIN inventory_minifigs im ON mir.inventory_minifig_id = im.id
+    WHERE im.id IS NOT NULL;
+UPDATE inventory_minifigs SET score_id = (
+    SELECT score_id FROM v_inventory_minifigs_scores WHERE
+    v_inventory_minifigs_scores.minifig_id = inventory_minifigs.id
+);
+DROP VIEW v_inventory_minifigs_scores;
+
+
+DROP TABLE colors_tmp;
+DROP TABLE elements_tmp;
+DROP TABLE inventories_tmp;
+DROP TABLE inventory_minifigs_tmp;
+DROP TABLE inventory_parts_tmp;
+DROP TABLE inventory_sets_tmp;
+DROP TABLE minifigs_tmp;
+DROP TABLE part_categories_tmp;
+DROP TABLE part_relationships_tmp;
+DROP TABLE parts_tmp;
+DROP TABLE sets_tmp;
+DROP TABLE themes_tmp;
+DROP TABLE tmp_sets_info;
+DROP TABLE tmp_scores;

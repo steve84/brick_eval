@@ -278,6 +278,5 @@ left join inventories i on mir.inventory_id = i.id and i.is_latest = 1
 left join (select * from scores group by inventory_id having max(calc_date)) sc on sc.inventory_id = i.id;
 
 
-'curl --remote-name-all https://cdn.rebrickable.com/media/downloads/{' + $x("//ul[@class='list-unstyled']//a[contains(@href,'media/downloads')]").map(a => a.href.split('https://cdn.rebrickable.com/media/downloads/')[1]).join(',') + '}.csv.gz'
+curl --remote-name-all 'https://rebrickable.com/media/downloads/{colors,elements,inventories,inventory_minifigs,inventory_parts,inventory_sets,minifigs,part_categories,part_relationships,parts,sets,themes}.csv.gz'
 gunzip *.gz
-rename 's/\.csv\.gz(.)*\.csv$/.csv/' *.csv

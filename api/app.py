@@ -3,13 +3,16 @@ from flask_restless import APIManager
 
 from db import db
 
+from models.set import SetModel
 from models.color import ColorModel
 from models.element import ElementModel
 from models.inventory import (
-    InventoryModel,
     InventoryMinifigModel,
+    MinifigInventoryRelation,
+    SetInventoryRelation,
+    InventoryModel,
     InventoryPartModel,
-    InventorySetModel
+    InventorySetModel,
 )
 from models.minifig import MinifigModel
 from models.part import (
@@ -17,7 +20,6 @@ from models.part import (
     PartColorFrequencyModel
 )
 from models.score import ScoreModel
-from models.set import SetModel
 from models.theme import ThemeModel
 
 from resources.theme import theme_bp
@@ -40,13 +42,13 @@ if __name__ == '__main__':
     manager.create_api(ColorModel)
     manager.create_api(ElementModel)
     manager.create_api(InventoryModel)
-    manager.create_api(InventoryMinifigModel, collection_name='inventory_minifigs')
+    manager.create_api(InventoryMinifigModel)
     manager.create_api(InventoryPartModel)
     manager.create_api(MinifigModel)
     manager.create_api(PartModel)
     manager.create_api(PartColorFrequencyModel)
     manager.create_api(ScoreModel)
-    manager.create_api(SetModel, collection_name='sets')
+    manager.create_api(SetModel)
     manager.create_api(ThemeModel)
     manager.app.register_blueprint(theme_bp)
     app.run(port=5000, host='0.0.0.0', debug=True)

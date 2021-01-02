@@ -21,6 +21,7 @@ class SetModel(db.Model):
     eol = Column(String(1), nullable=False, server_default='-1')
     retail_price = Column(Integer)
     score_id = Column(Integer, db.ForeignKey('scores.id'))
+    root_theme_id = Column(Integer, db.ForeignKey('themes.id'))
 
-    theme = db.relationship('ThemeModel')
+    theme = db.relationship('ThemeModel', foreign_keys=[theme_id])
     score = db.relationship('ScoreModel')

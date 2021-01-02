@@ -1,4 +1,5 @@
 import argparse
+import pandas as pd
 import sys
 import time
 
@@ -21,6 +22,8 @@ from models.inventory import (
 from models.part import PartColorFrequencyModel  # nopep8
 from models.score import ScoreModel  # nopep8
 from models.set import SetModel  # nopep8
+from models.statistic import StatisticModel  # nopep8
+from models.theme import ThemeModel  # nopep8
 
 
 def calcScore(session, max_amount_of_part, parts_of_set):
@@ -73,6 +76,88 @@ def processInventory(session, inventory_id, max_amount):
     session.add(score)
 
 
+def writeStatistics(session, scores, theme_id, max_days, is_minifig=False):
+    key = 'score'
+    due_date = date.today() - timedelta(days=max_days)
+
+    act_score = session.query(StatisticModel).filter(and_(
+        StatisticModel.is_set == (not is_minifig),
+        StatisticModel.theme_id == (theme_id[0] if theme_id and not is_minifig else None),
+        StatisticModel.property_name == 'score'
+    )).first()
+
+    if not act_score or act_score.calc_date < due_date:
+        is_insert = not act_score
+        if is_insert:
+            act_score = StatisticModel()
+
+        df = pd.DataFrame({key: map(lambda x: x.score, scores)})
+        df_stats = df.describe()
+
+        if df_stats[key]['count'] and df_stats[key]['count'] > 1:
+            act_score.is_set = not is_minifig
+            act_score.theme_id = theme_id[0] if theme_id and not is_minifig else None
+            act_score.property_name = key
+            act_score.count = df_stats[key]['count']
+            act_score.mean = df_stats[key]['mean']
+            act_score.std = df_stats[key]['std']
+            act_score.min_value = df_stats[key]['min']
+            act_score.lower_quartil = df_stats[key]['25%']
+            act_score.median = df_stats[key]['50%']
+            act_score.upper_quartil = df_stats[key]['75%']
+            act_score.max_value = df_stats[key]['max']
+            act_score.calc_date = func.current_date()
+        else:
+            return
+
+        if is_insert:
+            session.add(act_score)
+
+
+def updateStatistics(session, max_days=30):
+    themes = session.query(ThemeModel.id).filter(
+        ThemeModel.parent_id == None  # nopep8
+    ).all()
+
+    max_scores = session.query(
+        ScoreModel.id
+    ).group_by(
+        ScoreModel.id
+    ).having(
+        func.max(ScoreModel.calc_date)
+    )
+
+    scores_base = session.query(ScoreModel.score).join(
+        InventoryModel,
+        ScoreModel.inventory_id == InventoryModel.id,
+        isouter=True
+    ).join(
+        SetModel,
+        InventoryModel.set_id == SetModel.id,
+        isouter=True
+    )
+
+    themes.append(None)
+    for theme_id in themes:
+        add_filters = tuple()
+        add_filters += (ScoreModel.id.in_(max_scores),)
+        add_filters += (ScoreModel.score >= 0,)
+        add_filters += (InventoryModel.set_id != None,)  # nopep8
+
+        if theme_id:
+            add_filters += (SetModel.root_theme_id == theme_id[0],)
+
+        scores = scores_base.filter(*add_filters).all()
+        writeStatistics(session, scores, theme_id, max_days, False)
+
+    add_filters = tuple()
+    add_filters += (ScoreModel.id.in_(max_scores),)
+    add_filters += (ScoreModel.score >= 0,)
+    add_filters += (InventoryModel.set_id == None,)  # nopep8
+    scores = scores_base.filter(*add_filters).all()
+    writeStatistics(session, scores, None, max_days, True)
+
+
 db.init_app(app)
 with app.app_context():
 
@@ -97,6 +182,10 @@ with app.app_context():
         '--max_days', dest='max_days', type=int, default=90,
         help='calculate set score if entry is older than <max_days> days'
     )
+    parser.add_argument(
+        '--max_days_stat', dest='max_days_stat', type=int, default=30,
+        help='calculate score stats if entry older than <max_days_stat> days'
+    )
 
     themes_id = None if parser.parse_args(
     ).themes is None else parser.parse_args().themes.split(',')
@@ -106,6 +195,7 @@ with app.app_context():
     ).eol is None else parser.parse_args().eol.split(',')
     max_inventories = parser.parse_args().max_items
     max_days = parser.parse_args().max_days
+    max_days_stat = parser.parse_args().max_days_stat
 
     due_date = date.today() - timedelta(days=max_days)
 
@@ -216,4 +306,7 @@ with app.app_context():
     conn = db.session.connection().connection
     cursor = conn.cursor()
     cursor.executescript(sql)
+
+    updateStatistics(db.session, max_days_stat)
+
     db.session.commit()

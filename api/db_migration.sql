@@ -251,6 +251,20 @@ UPDATE inventory_minifigs SET score_id = (
 );
 DROP VIEW v_inventory_minifigs_scores;
 
+-- Set root theme ids
+DROP VIEW IF EXISTS v_root_theme;
+CREATE VIEW v_root_theme AS
+SELECT s.id, coalesce(t3.id, t2.id, t1.id) AS root_theme_id
+FROM sets s
+LEFT JOIN themes t1 ON s.theme_id = t1.id
+LEFT JOIN themes t2 ON t2.id = t1.parent_id
+LEFT JOIN themes t3 ON t3.id = t2.parent_id;
+UPDATE sets SET root_theme_id = (
+    SELECT root_theme_id FROM v_root_theme WHERE
+    v_root_theme.id = sets.id
+);
+DROP VIEW v_root_theme;
+
 
 DROP TABLE colors_tmp;
 DROP TABLE elements_tmp;

@@ -20,6 +20,7 @@ from models.part import (
     PartColorFrequencyModel
 )
 from models.score import ScoreModel
+from models.statistic import StatisticModel
 from models.theme import ThemeModel
 
 from resources.theme import theme_bp
@@ -39,16 +40,17 @@ def create_tables():
 if __name__ == '__main__':
     db.init_app(app)
     manager = APIManager(app, flask_sqlalchemy_db=db)
-    manager.create_api(ColorModel)
-    manager.create_api(ElementModel)
-    manager.create_api(InventoryModel)
-    manager.create_api(InventoryMinifigModel)
-    manager.create_api(InventoryPartModel)
-    manager.create_api(MinifigModel)
-    manager.create_api(PartModel)
-    manager.create_api(PartColorFrequencyModel)
-    manager.create_api(ScoreModel)
-    manager.create_api(SetModel)
-    manager.create_api(ThemeModel)
+    manager.create_api(ColorModel, methods=['GET'])
+    manager.create_api(ElementModel, methods=['GET'])
+    manager.create_api(InventoryModel, methods=['GET'])
+    manager.create_api(InventoryMinifigModel, methods=['GET'])
+    manager.create_api(InventoryPartModel, methods=['GET'])
+    manager.create_api(MinifigModel, methods=['GET'])
+    manager.create_api(PartModel, methods=['GET'])
+    manager.create_api(PartColorFrequencyModel, methods=['GET'])
+    manager.create_api(ScoreModel, methods=['GET'])
+    manager.create_api(SetModel, methods=['GET'])
+    manager.create_api(StatisticModel, methods=['GET'])
+    manager.create_api(ThemeModel, methods=['GET'])
     manager.app.register_blueprint(theme_bp)
     app.run(port=5000, host='0.0.0.0', debug=True)

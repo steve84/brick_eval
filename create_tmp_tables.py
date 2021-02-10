@@ -11,8 +11,8 @@ from datetime import datetime
 from ddlgenerator.ddlgenerator import Table
 
 
-export_dir = 'test_exports/'
-old_export_dir = 'test_exports_old/'
+export_dir = 'exports/'
+old_export_dir = 'exports_old/'
 
 if not os.path.exists(export_dir) or not os.path.isdir(export_dir):
     os.mkdir(export_dir)

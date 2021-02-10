@@ -47,6 +47,29 @@ DELETE FROM minifig_inventory_rel WHERE inventory_id NOT NULL;
 DELETE FROM set_inventory_rel WHERE inventory_id  NOT NULL;
 DELETE FROM scores WHERE id NOT NULL;
 
+
+-- If there are ddl changes
+PRAGMA foreign_keys = ON;
+
+DROP TABLE colors;
+DROP TABLE elements;
+DROP TABLE inventories;
+DROP TABLE inventory_minifigs;
+DROP TABLE inventory_parts;
+DROP TABLE inventory_sets;
+DROP TABLE minifig_inventory_rel;
+DROP TABLE minifigs;
+DROP TABLE part_categories;
+DROP TABLE part_color_frequencies;
+DROP TABLE part_relationships;
+DROP TABLE parts;
+DROP TABLE scores;
+DROP TABLE set_inventory_rel;
+DROP TABLE sets;
+DROP TABLE themes;
+
+-- Start flask server to create tables
+
 -- Insert queries --
 
 -- Base tables
@@ -207,16 +230,23 @@ INSERT INTO scores (inventory_id, score, calc_date)
 SELECT i.id AS inventory_id, tsc.score, tsc.calc_date FROM tmp_scores tsc
 LEFT JOIN sets s ON s.set_num = tsc.set_num
 LEFT JOIN inventories i ON i.set_id = s.id AND i.is_latest = 1
-WHERE tsc.set_num IS NOT NULL
+WHERE tsc.set_num IS NOT NULL AND i.id IS NOT NULL
 UNION ALL
 SELECT DISTINCT i.id AS inventory_id, tsc.score, tsc.calc_date FROM tmp_scores tsc
 LEFT JOIN minifigs m ON m.fig_num = tsc.fig_num
 LEFT JOIN inventory_minifigs im ON im.fig_id = m.id
 LEFT JOIN minifig_inventory_rel mir ON mir.inventory_minifig_id = im.id
 LEFT JOIN inventories i ON i.id = mir.inventory_id AND i.is_latest = 1
-WHERE tsc.fig_num IS NOT NULL;
+WHERE tsc.fig_num IS NOT NULL AND i.id IS NOT NULL;
 
 -- Set score ids
+CREATE TABLE tmp_act_set_score (
+	set_id INTEGER NOT NULL,
+	score_id INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX tmp_act_set_index ON tmp_act_set_score (set_id);
+
 DROP VIEW IF EXISTS v_sets_scores;
 CREATE VIEW v_sets_scores AS
     SELECT DISTINCT s.id AS set_id, sc.id AS score_id FROM (
@@ -227,12 +257,21 @@ CREATE VIEW v_sets_scores AS
     LEFT JOIN inventories i ON sc.inventory_id = i.id
     LEFT JOIN sets s ON i.set_id = s.id
     WHERE s.id IS NOT NULL;
-UPDATE sets SET score_id = (
-    SELECT score_id FROM v_sets_scores
-    WHERE v_sets_scores.set_id = sets.id
-);
-DROP VIEW v_sets_scores;
 
+INSERT INTO tmp_act_set_score
+select * from v_sets_scores;
+
+UPDATE sets SET score_id = (SELECT score_id FROM tmp_act_set_score WHERE tmp_act_set_score.set_id = sets.id);
+DROP VIEW v_sets_scores;
+DROP TABLE tmp_act_set_score;
+
+
+CREATE TABLE tmp_act_minifig_score (
+	minifig_id INTEGER NOT NULL,
+	score_id INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX tmp_act_minifig_index ON tmp_act_minifig_score (minifig_id);
 
 DROP VIEW IF EXISTS v_inventory_minifigs_scores;
 CREATE VIEW v_inventory_minifigs_scores AS
@@ -245,11 +284,16 @@ CREATE VIEW v_inventory_minifigs_scores AS
     LEFT JOIN minifig_inventory_rel mir ON i.id = mir.inventory_id
     LEFT JOIN inventory_minifigs im ON mir.inventory_minifig_id = im.id
     WHERE im.id IS NOT NULL;
+
+INSERT INTO tmp_act_minifig_score
+select * from v_inventory_minifigs_scores;
+
 UPDATE inventory_minifigs SET score_id = (
-    SELECT score_id FROM v_inventory_minifigs_scores WHERE
-    v_inventory_minifigs_scores.minifig_id = inventory_minifigs.id
+    SELECT score_id FROM tmp_act_minifig_score WHERE
+    tmp_act_minifig_score.minifig_id = inventory_minifigs.id
 );
 DROP VIEW v_inventory_minifigs_scores;
+DROP TABLE tmp_act_minifig_score;
 
 -- Set root theme ids
 DROP VIEW IF EXISTS v_root_theme;

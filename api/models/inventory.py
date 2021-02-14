@@ -75,7 +75,7 @@ class InventoryPartModel(db.Model):
     part = db.relationship('PartModel')
     part_color_frequency = db.relationship('PartColorFrequencyModel',
                                            primaryjoin="and_(InventoryPartModel.color_id==PartColorFrequencyModel.color_id, InventoryPartModel.part_id==PartColorFrequencyModel.part_id)")
-    element = db.relationship('ElementModel',
+    elements = db.relationship('ElementModel',
                               primaryjoin="and_(InventoryPartModel.color_id==ElementModel.color_id, InventoryPartModel.part_id==ElementModel.part_id)")
 
 

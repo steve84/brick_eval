@@ -14,6 +14,12 @@ CREATE TABLE tmp_scores (
 	calc_date DATE NOT NULL
 );
 
+CREATE TABLE tmp_element_prices (
+	element_id INTEGER NOT NULL,
+	provider_id INTEGER NOT NULL,
+	price INTEGER NOT NULL
+);
+
 
 -- Insert generated data into tmp tables
 INSERT INTO tmp_sets_info
@@ -26,6 +32,9 @@ LEFT JOIN minifig_inventory_rel mir ON i.id = mir.inventory_id
 LEFT JOIN inventory_minifigs im ON mir.inventory_minifig_id = im.id
 LEFT JOIN sets s ON i.set_id = s.id
 LEFT JOIN minifigs m ON im.fig_id = m.id;
+
+INSERT INTO tmp_element_prices
+SELECT element_id, provider_id, price FROM element_prices;
 
 
 -- Delete queries --
@@ -46,7 +55,7 @@ DELETE FROM inventory_parts WHERE inventory_id NOT NULL;
 DELETE FROM minifig_inventory_rel WHERE inventory_id NOT NULL;
 DELETE FROM set_inventory_rel WHERE inventory_id  NOT NULL;
 DELETE FROM scores WHERE id NOT NULL;
-
+DELETE FROM element_prices WHERE id NOT NULL;
 
 -- If there are ddl changes
 PRAGMA foreign_keys = ON;
@@ -67,6 +76,7 @@ DROP TABLE scores;
 DROP TABLE set_inventory_rel;
 DROP TABLE sets;
 DROP TABLE themes;
+DROP TABLE element_prices;
 
 -- Start flask server to create tables
 
@@ -239,6 +249,9 @@ LEFT JOIN minifig_inventory_rel mir ON mir.inventory_minifig_id = im.id
 LEFT JOIN inventories i ON i.id = mir.inventory_id AND i.is_latest = 1
 WHERE tsc.fig_num IS NOT NULL AND i.id IS NOT NULL;
 
+INSERT INTO element_prices (element_id, provider_id, price)
+SELECT element_id, provider_id, price FROM tmp_element_prices;
+
 -- Set score ids
 CREATE TABLE tmp_act_set_score (
 	set_id INTEGER NOT NULL,
@@ -324,3 +337,4 @@ DROP TABLE sets_tmp;
 DROP TABLE themes_tmp;
 DROP TABLE tmp_sets_info;
 DROP TABLE tmp_scores;
+DROP TABLE tmp_element_prices;

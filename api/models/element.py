@@ -25,3 +25,21 @@ class ElementModel(db.Model):
 
     color = db.relationship('ColorModel')
     part = db.relationship('PartModel')
+    prices = db.relationship('ElementPriceModel')
+
+
+class ElementPriceModel(db.Model):
+    __tablename__ = 'element_prices'
+    __table_args__ = (
+        db.Index('element_price_index', 'element_id',
+                 'provider_id', unique=True),
+    )
+
+    id = Column(Integer, primary_key=True)
+    element_id = Column(
+        Text,
+        db.ForeignKey('elements.element_id'),
+        nullable=False
+    )
+    provider_id = Column(Integer, nullable=False)
+    price = Column(Integer, nullable=False)

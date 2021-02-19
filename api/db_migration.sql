@@ -311,7 +311,7 @@ DROP TABLE tmp_act_minifig_score;
 -- Set root theme ids
 DROP VIEW IF EXISTS v_root_theme;
 CREATE VIEW v_root_theme AS
-SELECT s.id, coalesce(t3.id, t2.id, t1.id) AS root_theme_id
+SELECT s.id, COALESCE(t3.id, t2.id, t1.id) AS root_theme_id
 FROM sets s
 LEFT JOIN themes t1 ON s.theme_id = t1.id
 LEFT JOIN themes t2 ON t2.id = t1.parent_id
@@ -322,6 +322,34 @@ UPDATE sets SET root_theme_id = (
 );
 DROP VIEW v_root_theme;
 
+-- Update minifig properties
+DROP VIEW IF EXISTS v_minifig_has_unique_part;
+CREATE VIEW v_minifig_has_unique_part AS
+SELECT m.id, MIN(pcf.total_amount) = 1 AS has_unique_part FROM minifigs m
+LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
+LEFT JOIN minifig_inventory_rel mir ON im.id = mir.inventory_minifig_id
+LEFT JOIN inventories i ON i.id = mir.inventory_id and i.is_latest = 1
+LEFT JOIN (SELECT inventory_id, part_id, color_id, sum(quantity) AS quantity FROM inventory_parts GROUP BY inventory_id, part_id, color_id) ip ON i.id = ip.inventory_id
+LEFT JOIN part_color_frequencies pcf ON ip.part_id = pcf.part_id AND ip.color_id = pcf.color_id
+GROUP BY m.id;
+UPDATE minifigs SET has_unique_part = (
+    SELECT has_unique_part FROM v_minifig_has_unique_part WHERE
+    v_minifig_has_unique_part.id = minifigs.id
+);
+DROP VIEW v_minifig_has_unique_part;
+
+DROP VIEW IF EXISTS v_minifig_year_of_publication;
+CREATE VIEW v_minifig_year_of_publication AS
+SELECT m.id, MIN(s.year_of_publication) AS year_of_publication FROM minifigs m
+LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
+LEFT JOIN inventories i ON i.id = im.inventory_id and i.is_latest = 1
+LEFT JOIN sets s ON i.set_id = s.id
+GROUP BY m.id;
+UPDATE minifigs SET year_of_publication = (
+    SELECT year_of_publication FROM v_minifig_year_of_publication WHERE
+    v_minifig_year_of_publication.id = minifigs.id
+);
+DROP VIEW v_minifig_year_of_publication;
 
 DROP TABLE colors_tmp;
 DROP TABLE elements_tmp;

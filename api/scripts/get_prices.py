@@ -61,6 +61,22 @@ data = json.loads(
      '{ formattedAmount centAmount __typename } __typename}"}')
 )
 
+
+def isSetInResponse(json_resp, setnr):
+    return ('data' in json_resp.keys() and
+            'searchSuggestions' in json_resp['data'].keys() and
+            json_resp['data']['searchSuggestions'] is not None and
+            len(json_resp['data']['searchSuggestions']) > 0 and
+            setnr in [t['productCode'] for t in json_resp['data']['searchSuggestions'] if 'productCode' in t.keys()])
+
+
+def getPrice(data):
+    if 'variants' in data.keys() and len(data['variants']) > 0:
+        return data['variants'][0]['price']['centAmount']
+    else:
+        return data['variant']['price']['centAmount']
+
+
 s = requests.Session()
 
 add_filters = tuple()
@@ -93,19 +109,18 @@ with app.app_context():
                 json=data
             )
             json_resp = response.json()
-            if ('data' in json_resp.keys() and
-                    'searchSuggestions' in json_resp['data'].keys() and
-                    json_resp['data']['searchSuggestions'] is not None and
-                    len(json_resp['data']['searchSuggestions']) == 1):
-                set_data = json_resp['data']['searchSuggestions'][0]
-                if ('productCode' in set_data.keys() and
-                        'variant' in set_data.keys() and
-                        set_data['productCode'] == setnr):
-                    price = set_data['variant']['price']['centAmount']
-                    print('%s: %d' % (setrow.set_num, price))
-                    setrow.retail_price = int(price)
-                    if str(setrow.eol) not in ['2', '3']:
-                        setrow.eol = '1'
+            if isSetInResponse(json_resp, setnr):
+                for set_data in json_resp['data']['searchSuggestions']:
+                    if (('variant' in set_data.keys() or
+                            'variants' in set_data.keys()) and
+                            set_data['productCode'] == setnr):
+                        price = getPrice(set_data)
+                        print('%s: %d' % (setrow.set_num, price))
+                        setrow.retail_price = int(price)
+                        if str(setrow.eol) not in ['2', '3']:
+                            setrow.eol = '1'
+
+                        break
             else:
                 print('Setnr not found: %s' % setrow.set_num)
                 setrow.eol = '0'

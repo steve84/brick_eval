@@ -58,12 +58,21 @@ def calcScore(session, max_amount_of_part, parts_of_set):
     return total_score
 
 
-def processInventory(session, inventory_id, max_amount):
+def processInventory(session, inventory_id, max_amount, factor=1):
     actual_score = session.query(ScoreModel).filter(
         ScoreModel.inventory_id == inventory_id
     ).first()
 
-    parts = session.query(InventoryPartModel).filter(
+    parts = session.query(
+        InventoryPartModel.inventory_id,
+        InventoryPartModel.part_id,
+        InventoryPartModel.color_id,
+        func.sum(InventoryPartModel.quantity * factor).label('quantity')
+    ).group_by(
+        InventoryPartModel.inventory_id,
+        InventoryPartModel.part_id,
+        InventoryPartModel.color_id
+    ).filter(
         InventoryPartModel.inventory_id == inventory_id
     ).all()
 
@@ -239,30 +248,34 @@ with app.app_context():
         )
 
         inventory_candidates = db.session.query(
-            MinifigInventoryRelation.inventory_id
+            MinifigInventoryRelation.inventory_id,
+            MinifigInventoryRelation.quantity
         ).filter(
             MinifigInventoryRelation.inventory_minifig_id.in_(
                 inventories_fig
             )
-        )
+        ).all()
 
-        # Works only with ScoreModel.id == None
-        # Does not work ScoreModel.id is None
-        fig_inventories = db.session.query(InventoryModel.id).join(
-            ScoreModel,
-            ScoreModel.inventory_id == InventoryModel.id,
-            isouter=True
-        ).filter(and_(
-            InventoryModel.is_latest,
-            InventoryModel.id.in_(inventory_candidates),
-            or_(ScoreModel.id == None, ScoreModel.calc_date < due_date)
-        )).all()  # nopep8
+        id_quantity_map = {k: p for k, p in inventory_candidates}
 
-        for inventory_minifig in fig_inventories:
-            processInventory(
-                db.session, inventory_minifig.id,
-                max_amount
-            )
+        if len(inventory_candidates) > 0:
+            # Works only with ScoreModel.id == None
+            # Does not work ScoreModel.id is None
+            fig_inventories = db.session.query(InventoryModel.id).join(
+                ScoreModel,
+                ScoreModel.inventory_id == InventoryModel.id,
+                isouter=True
+            ).filter(and_(
+                InventoryModel.is_latest,
+                InventoryModel.id.in_(id_quantity_map.keys()),
+                or_(ScoreModel.id == None, ScoreModel.calc_date < due_date)
+            )).all()  # nopep8
+
+            for inventory_minifig in fig_inventories:
+                processInventory(
+                    db.session, inventory_minifig.id,
+                    max_amount, factor=id_quantity_map[inventory_minifig.id]
+                )
 
         db.session.commit()
 

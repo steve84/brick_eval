@@ -156,8 +156,8 @@ SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_parts
 INSERT OR IGNORE INTO part_color_frequencies (part_id, color_id)
 SELECT DISTINCT part_id, color_id FROM inventory_parts;
 
-INSERT OR IGNORE INTO minifig_inventory_rel (inventory_id, inventory_minifig_id)
-SELECT i.id, im.id FROM inventory_minifigs im
+INSERT OR IGNORE INTO minifig_inventory_rel (inventory_id, inventory_minifig_id, quantity)
+SELECT i.id, im.id, im.quantity FROM inventory_minifigs im
 LEFT JOIN minifigs m ON im.fig_id = m.id
 LEFT JOIN inventories_tmp i ON m.fig_num = i.set_num;
 
@@ -250,7 +250,7 @@ LEFT JOIN inventories i ON i.id = mir.inventory_id AND i.is_latest = 1
 WHERE tsc.fig_num IS NOT NULL AND i.id IS NOT NULL;
 
 INSERT INTO element_prices (element_id, provider_id, price)
-SELECT element_id, provider_id, price FROM tmp_element_prices;
+SELECT element_id, provider_id, price FROM tmp_element_prices where element_id in (select element_id from elements);
 
 -- Set score ids
 CREATE TABLE tmp_act_set_score (

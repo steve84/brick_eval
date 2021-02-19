@@ -112,3 +112,4 @@ class MinifigInventoryRelation(db.Model):
                                      db.ForeignKey('inventory_minifigs.id'))
     inventory_id = db.Column(db.Integer,
                              db.ForeignKey('inventories.id'))
+    quantity = Column(Integer, nullable=False)

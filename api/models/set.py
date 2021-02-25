@@ -18,7 +18,7 @@ class SetModel(db.Model):
     year_of_publication = Column(Integer, nullable=False)
     theme_id = Column(Integer, db.ForeignKey('themes.id'), nullable=False)
     num_parts = Column(Integer, nullable=False)
-    eol = Column(String(1), nullable=False, server_default='-1')
+    eol = Column(String(2), nullable=False, server_default='-1')
     retail_price = Column(Integer)
     score_id = Column(Integer, db.ForeignKey('scores.id'))
     root_theme_id = Column(Integer, db.ForeignKey('themes.id'))

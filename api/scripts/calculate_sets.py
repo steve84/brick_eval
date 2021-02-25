@@ -39,13 +39,11 @@ def calcScore(session, max_amount_of_part, parts_of_set):
 
     startTime = time.time()
     for part in parts_of_set:
-        part_id = part.part_id
-        color_id = part.color_id
+        part_color_frequency_id = part.part_color_frequency_id
         quantity = part.quantity
 
         part_freq = session.query(PartColorFrequencyModel).filter(and_(
-            PartColorFrequencyModel.color_id == color_id,
-            PartColorFrequencyModel.part_id == part_id
+            PartColorFrequencyModel.id == part_color_frequency_id
         )).first()
 
         max_amount = max_amount_of_part.total_amount
@@ -65,13 +63,11 @@ def processInventory(session, inventory_id, max_amount, factor=1):
 
     parts = session.query(
         InventoryPartModel.inventory_id,
-        InventoryPartModel.part_id,
-        InventoryPartModel.color_id,
+        InventoryPartModel.part_color_frequency_id,
         func.sum(InventoryPartModel.quantity * factor).label('quantity')
     ).group_by(
         InventoryPartModel.inventory_id,
-        InventoryPartModel.part_id,
-        InventoryPartModel.color_id
+        InventoryPartModel.part_color_frequency_id
     ).filter(
         InventoryPartModel.inventory_id == inventory_id
     ).all()
@@ -129,12 +125,12 @@ def updateStatistics(session, max_days=30):
     ).all()
 
     max_scores = session.query(
-        ScoreModel.id
+        ScoreModel.id,
+        func.max((ScoreModel.calc_date))
     ).group_by(
         ScoreModel.id
-    ).having(
-        func.max(ScoreModel.calc_date)
-    )
+    ).all()
+    max_score_ids = [i.id for i in max_scores]
 
     scores_base = session.query(ScoreModel.score).join(
         InventoryModel,
@@ -145,11 +141,10 @@ def updateStatistics(session, max_days=30):
         InventoryModel.set_id == SetModel.id,
         isouter=True
     )
-
     themes.append(None)
     for theme_id in themes:
         add_filters = tuple()
-        add_filters += (ScoreModel.id.in_(max_scores),)
+        add_filters += (ScoreModel.id.in_(max_score_ids),)
         add_filters += (ScoreModel.score >= 0,)
         add_filters += (InventoryModel.set_id != None,)  # nopep8
 
@@ -160,7 +155,7 @@ def updateStatistics(session, max_days=30):
         writeStatistics(session, scores, theme_id, max_days, False)
 
     add_filters = tuple()
-    add_filters += (ScoreModel.id.in_(max_scores),)
+    add_filters += (ScoreModel.id.in_(max_score_ids),)
     add_filters += (ScoreModel.score >= 0,)
     add_filters += (InventoryModel.set_id == None,)  # nopep8
     scores = scores_base.filter(*add_filters).all()
@@ -283,17 +278,25 @@ with app.app_context():
         DROP VIEW IF EXISTS v_sets_scores;
         CREATE VIEW v_sets_scores AS
             SELECT DISTINCT s.id AS set_id, sc.id AS score_id FROM (
-                SELECT * FROM scores
-                GROUP BY inventory_id
-                HAVING MAX(calc_date)
-            ) SC
-            LEFT JOIN inventories i ON sc.inventory_id = i.id
+                SELECT * FROM scores WHERE id IN (SELECT DISTINCT
+                first_value(id) OVER (PARTITION BY inventory_id ORDER BY calc_date DESC)
+                FROM scores
+                ORDER BY 1
+            )) SC
+            LEFT JOIN inventories i ON SC.inventory_id = i.id
             LEFT JOIN sets s ON i.set_id = s.id
             WHERE s.id IS NOT NULL;
-        UPDATE sets SET score_id = (
-            SELECT score_id FROM v_sets_scores
-            WHERE v_sets_scores.set_id = sets.id
+        CREATE TABLE tmp_sets_score (
+            set_id INTEGER NOT NULL,
+            score_id INTEGER NOT NULL
         );
+        INSERT INTO tmp_sets_score
+        SELECT * FROM v_sets_scores;
+        UPDATE sets SET score_id = (
+            SELECT score_id FROM tmp_sets_score
+            WHERE tmp_sets_score.set_id = sets.id
+        );
+        DROP TABLE tmp_sets_score;
         DROP VIEW v_sets_scores;
         """
 
@@ -301,24 +304,32 @@ with app.app_context():
         DROP VIEW IF EXISTS v_inventory_minifigs_scores;
         CREATE VIEW v_inventory_minifigs_scores AS
             SELECT DISTINCT im.id AS minifig_id, sc.id AS score_id FROM (
-                SELECT * FROM scores
-                GROUP BY inventory_id
-                HAVING MAX(calc_date)
-            ) SC
-            LEFT JOIN inventories i ON sc.inventory_id = i.id
+                SELECT * FROM scores WHERE id IN (SELECT DISTINCT
+                first_value(id) OVER (PARTITION BY inventory_id ORDER BY calc_date DESC)
+                FROM scores
+                ORDER BY 1
+            )) SC
+            LEFT JOIN inventories i ON SC.inventory_id = i.id
             LEFT JOIN minifig_inventory_rel mir ON i.id = mir.inventory_id
             LEFT JOIN inventory_minifigs im ON mir.inventory_minifig_id = im.id
             WHERE im.id IS NOT NULL;
-        UPDATE inventory_minifigs SET score_id = (
-            SELECT score_id FROM v_inventory_minifigs_scores WHERE
-            v_inventory_minifigs_scores.minifig_id = inventory_minifigs.id
+        CREATE TABLE tmp_minifigs_score (
+            minifig_id INTEGER NOT NULL,
+            score_id INTEGER NOT NULL
         );
+        INSERT INTO tmp_minifigs_score
+        SELECT * FROM v_inventory_minifigs_scores;
+        UPDATE inventory_minifigs SET score_id = (
+            SELECT score_id FROM tmp_minifigs_score WHERE
+            tmp_minifigs_score.minifig_id = inventory_minifigs.id
+        );
+        DROP TABLE tmp_minifigs_score;
         DROP VIEW v_inventory_minifigs_scores;
         """
 
     conn = db.session.connection().connection
     cursor = conn.cursor()
-    cursor.executescript(sql)
+    cursor.execute(sql)
 
     updateStatistics(db.session, max_days_stat)
 

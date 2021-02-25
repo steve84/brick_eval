@@ -83,48 +83,59 @@ DROP TABLE element_prices;
 -- Insert queries --
 
 -- Base tables
-INSERT OR IGNORE INTO colors (id, name, rgb, is_trans)
+INSERT INTO colors (id, name, rgb, is_trans)
 SELECT id, name, rgb, is_trans FROM colors_tmp;
 
-INSERT OR IGNORE INTO minifigs (fig_num, name, num_parts)
+INSERT INTO minifigs (fig_num, name, num_parts)
 SELECT fig_num, name, num_parts FROM minifigs_tmp;
 
-INSERT OR IGNORE INTO part_categories (id, name)
+INSERT INTO part_categories (id, name)
 SELECT id, name FROM part_categories_tmp;
 
-INSERT OR IGNORE INTO themes (id, name, parent_id)
+INSERT INTO themes (id, name, parent_id)
 SELECT id, name, parent_id FROM themes_tmp;
 
-INSERT OR IGNORE INTO sets (set_num, name, year_of_publication, theme_id, num_parts)
+INSERT INTO sets (set_num, name, year_of_publication, theme_id, num_parts)
 SELECT set_num, name, year_of_publication, theme_id, num_parts FROM sets_tmp;
 
-INSERT OR IGNORE INTO parts (part_num, name, part_cat_id, part_material)
+INSERT INTO parts (part_num, name, part_cat_id, part_material)
 SELECT part_num, name, part_cat_id, part_material FROM parts_tmp;
 
-INSERT OR IGNORE INTO elements (element_id, part_id, color_id)
-SELECT element_id, p.id, color_id FROM elements_tmp e
-LEFT JOIN parts p ON e.part_num = p.part_num;
+INSERT INTO part_color_frequencies (part_id, color_id)
+SELECT DISTINCT p.id, c.id FROM inventory_parts_tmp ip
+LEFT JOIN parts p ON p.part_num = ip.part_num
+LEFT JOIN colors c ON c.id = ip.color_id;
 
-INSERT OR IGNORE INTO inventories (id, set_id, version)
+INSERT INTO inventories (id, set_id, version)
 SELECT t.id, s.id, version FROM inventories_tmp t
 LEFT JOIN sets s ON t.set_num = s.set_num;
 
-INSERT OR IGNORE INTO part_relationships (rel_type, child_part_id, parent_part_id)
+INSERT INTO part_relationships (rel_type, child_part_id, parent_part_id)
 SELECT rel_type, p1.id, p2.id FROM part_relationships_tmp t
 LEFT JOIN parts p1 ON t.child_part_num = p1.part_num
 LEFT JOIN parts p2 ON t.parent_part_num = p2.part_num;
 
-INSERT OR IGNORE INTO inventory_minifigs (inventory_id, fig_id, quantity)
+INSERT INTO inventory_minifigs (inventory_id, fig_id, quantity)
 SELECT inventory_id, m.id, quantity FROM inventory_minifigs_tmp t
 LEFT JOIN minifigs m ON m.fig_num = t.fig_num;
 
-INSERT OR IGNORE INTO inventory_sets (inventory_id, set_id, quantity)
+INSERT INTO inventory_sets (inventory_id, set_id, quantity)
 SELECT inventory_id, s.id, quantity FROM inventory_sets_tmp t
 LEFT JOIN sets s ON s.set_num = t.set_num;
 
-INSERT OR IGNORE INTO inventory_parts (inventory_id, part_id, color_id, is_spare, quantity)
-SELECT inventory_id, p.id, color_id, is_spare, quantity FROM inventory_parts_tmp t
-LEFT JOIN parts p ON t.part_num = p.part_num;
+INSERT INTO elements (element_id, part_color_frequency_id)
+SELECT e.element_id, pcf.id FROM elements_tmp e
+LEFT JOIN parts p ON e.part_num = p.part_num
+LEFT JOIN colors c ON e.color_id = c.id
+LEFT JOIN part_color_frequencies pcf ON p.id = pcf.part_id AND c.id = pcf.color_id
+WHERE pcf.id IS NOT NULL;
+
+INSERT INTO inventory_parts (inventory_id, part_color_frequency_id, is_spare, quantity)
+SELECT inventory_id, pcf.id, is_spare, quantity FROM inventory_parts_tmp t
+LEFT JOIN parts p ON t.part_num = p.part_num
+LEFT JOIN colors c ON t.color_id = c.id
+LEFT JOIN part_color_frequencies pcf ON p.id = pcf.part_id AND c.id = pcf.color_id
+WHERE pcf.id IS NOT NULL;
 
 --- Insert check
 SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM colors) c, (SELECT count(*) AS amount FROM colors_tmp) ct
@@ -153,15 +164,12 @@ SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_parts
 
 
 -- Generated FROM base tables
-INSERT OR IGNORE INTO part_color_frequencies (part_id, color_id)
-SELECT DISTINCT part_id, color_id FROM inventory_parts;
-
-INSERT OR IGNORE INTO minifig_inventory_rel (inventory_id, inventory_minifig_id, quantity)
+INSERT INTO minifig_inventory_rel (inventory_id, inventory_minifig_id, quantity)
 SELECT i.id, im.id, im.quantity FROM inventory_minifigs im
 LEFT JOIN minifigs m ON im.fig_id = m.id
 LEFT JOIN inventories_tmp i ON m.fig_num = i.set_num;
 
-INSERT OR IGNORE INTO set_inventory_rel (inventory_id, inventory_set_id)
+INSERT INTO set_inventory_rel (inventory_id, inventory_set_id)
 SELECT i.id, invs.id FROM inventory_sets invs
 LEFT JOIN sets s ON invs.set_id = s.id
 LEFT JOIN inventories_tmp i ON s.set_num = i.set_num;
@@ -183,41 +191,47 @@ LEFT JOIN inventories i ON i.id = mir.inventory_id
 LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
 GROUP BY im.fig_id) AS im_max ON im_max.fig_id = im.fig_id AND im_max.max_version = i.version;
 
-UPDATE inventories SET is_latest = 1 WHERE inventories.id IN (SELECT id FROM v_latest_inventory);
-UPDATE inventories SET is_latest = 0 WHERE inventories.id NOT IN (SELECT id FROM v_latest_inventory);
+UPDATE inventories SET is_latest = TRUE WHERE inventories.id IN (SELECT id FROM v_latest_inventory);
+UPDATE inventories SET is_latest = FALSE WHERE inventories.id NOT IN (SELECT id FROM v_latest_inventory);
 
 
 -- Update part_color_frequencies table (quantity)
 
 CREATE VIEW v_total_quantities as
-SELECT part_id, color_id, sum(quantity) AS quantity
-FROM (SELECT ip.part_id, ip.color_id, sum(ip.quantity) AS quantity
-FROM (SELECT * FROM inventories WHERE is_latest = 1 AND set_id IS NOT NULL) i
+SELECT subq.part_color_frequency_id, sum(subq.quantity) AS quantity
+FROM (SELECT ip.part_color_frequency_id, sum(ip.quantity) AS quantity
+FROM (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id IS NOT NULL) i
 LEFT JOIN inventory_parts ip ON i.id = ip.inventory_id
-GROUP BY ip.part_id, ip.color_id
+GROUP BY ip.part_color_frequency_id
 UNION ALL
-SELECT ip.part_id, ip.color_id, sum(ip.quantity * im.quantity) AS quantity FROM minifig_inventory_rel mir
-LEFT JOIN (SELECT * FROM inventories WHERE is_latest = 1 AND set_id is NULL) i ON i.id = mir.inventory_id
+SELECT ip.part_color_frequency_id, sum(ip.quantity * im.quantity) AS quantity FROM minifig_inventory_rel mir
+LEFT JOIN (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id is NULL) i ON i.id = mir.inventory_id
 LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
 LEFT JOIN inventory_parts ip ON i.id = ip.inventory_id
-GROUP BY ip.part_id, ip.color_id)
-GROUP BY part_id, color_id;
+GROUP BY ip.part_color_frequency_id) AS subq
+GROUP BY subq.part_color_frequency_id;
 
+CREATE TABLE tmp_part_freq (
+	part_color_frequency_id INTEGER UNIQUE NOT NULL,
+	quantity INTEGER NOT NULL
+);
 
-UPDATE part_color_frequencies
+INSERT INTO tmp_part_freq
+SELECT part_color_frequency_id, quantity FROM v_total_quantities WHERE part_color_frequency_id IS NOT NULL;
+
+UPDATE part_color_frequencies pcf
 SET
-      total_amount = (SELECT v_total_quantities.quantity 
-                            FROM v_total_quantities
-                            WHERE v_total_quantities.part_id = part_color_frequencies.part_id AND 
-							v_total_quantities.color_id = part_color_frequencies.color_id)
-
+      total_amount = (SELECT quantity 
+                            FROM tmp_part_freq
+                            WHERE tmp_part_freq.part_color_frequency_id = pcf.id)
 WHERE
     EXISTS (
         SELECT *
-        FROM v_total_quantities
-        WHERE v_total_quantities.part_id = part_color_frequencies.part_id AND 
-							v_total_quantities.color_id = part_color_frequencies.color_id
+        FROM tmp_part_freq
+        WHERE tmp_part_freq.part_color_frequency_id = pcf.id
     );
+
+DROP TABLE tmp_part_freq;
 
 
 DROP VIEW v_total_quantities;
@@ -324,31 +338,43 @@ DROP VIEW v_root_theme;
 
 -- Update minifig properties
 DROP VIEW IF EXISTS v_minifig_has_unique_part;
+
 CREATE VIEW v_minifig_has_unique_part AS
 SELECT m.id, MIN(pcf.total_amount) = 1 AS has_unique_part FROM minifigs m
 LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
 LEFT JOIN minifig_inventory_rel mir ON im.id = mir.inventory_minifig_id
-LEFT JOIN inventories i ON i.id = mir.inventory_id and i.is_latest = 1
-LEFT JOIN (SELECT inventory_id, part_id, color_id, sum(quantity) AS quantity FROM inventory_parts GROUP BY inventory_id, part_id, color_id) ip ON i.id = ip.inventory_id
-LEFT JOIN part_color_frequencies pcf ON ip.part_id = pcf.part_id AND ip.color_id = pcf.color_id
+LEFT JOIN inventories i ON i.id = mir.inventory_id and i.is_latest = TRUE
+LEFT JOIN (SELECT inventory_id, part_color_frequency_id, sum(quantity) AS quantity FROM inventory_parts GROUP BY inventory_id, part_color_frequency_id) ip ON i.id = ip.inventory_id
+LEFT JOIN part_color_frequencies pcf ON ip.part_color_frequency_id = pcf.id
 GROUP BY m.id;
-UPDATE minifigs SET has_unique_part = (
-    SELECT has_unique_part FROM v_minifig_has_unique_part WHERE
-    v_minifig_has_unique_part.id = minifigs.id
-);
-DROP VIEW v_minifig_has_unique_part;
 
 DROP VIEW IF EXISTS v_minifig_year_of_publication;
+
 CREATE VIEW v_minifig_year_of_publication AS
 SELECT m.id, MIN(s.year_of_publication) AS year_of_publication FROM minifigs m
 LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
-LEFT JOIN inventories i ON i.id = im.inventory_id and i.is_latest = 1
+LEFT JOIN inventories i ON i.id = im.inventory_id and i.is_latest = TRUE
 LEFT JOIN sets s ON i.set_id = s.id
 GROUP BY m.id;
-UPDATE minifigs SET year_of_publication = (
-    SELECT year_of_publication FROM v_minifig_year_of_publication WHERE
-    v_minifig_year_of_publication.id = minifigs.id
+
+CREATE TABLE tmp_minifig_props (
+	id INTEGER UNIQUE NOT NULL,
+	has_unique_part BOOLEAN NOT NULL,
+    year_of_publication INTEGER NOT NULL
 );
+
+INSERT INTO tmp_minifig_props
+SELECT v1.id, v1.has_unique_part, v2.year_of_publication FROM v_minifig_has_unique_part v1
+LEFT JOIN v_minifig_year_of_publication v2 on v2.id = v1.id
+WHERE v1.has_unique_part IS NOT NULL AND v2.year_of_publication IS NOT NULL;
+
+UPDATE minifigs SET (has_unique_part, year_of_publication) = (
+    SELECT has_unique_part, year_of_publication FROM tmp_minifig_props WHERE
+    tmp_minifig_props.id = minifigs.id
+);
+
+DROP TABLE tmp_minifig_props;
+DROP VIEW v_minifig_has_unique_part;
 DROP VIEW v_minifig_year_of_publication;
 
 DROP TABLE colors_tmp;

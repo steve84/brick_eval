@@ -10,3 +10,4 @@ ddlgenerator
 pycodestyle
 autopep8
 rope
+psycopg2-binary

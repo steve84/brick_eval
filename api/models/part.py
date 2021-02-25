@@ -51,13 +51,11 @@ class PartColorFrequencyModel(db.Model):
             'color_id',
             'part_id',
             name='part_color_freq_index'),
-        db.ForeignKeyConstraint(
-            ['part_id', 'color_id'],
-            ['inventory_parts.part_id', 'inventory_parts.color_id']
-        )
     )
 
     id = Column(Integer, primary_key=True)
     part_id = Column(Integer, db.ForeignKey('parts.id'), nullable=False)
     color_id = Column(Integer, db.ForeignKey('colors.id'), nullable=False)
     total_amount = Column(Integer, nullable=False, server_default='0')
+
+    part = db.relationship('PartModel')

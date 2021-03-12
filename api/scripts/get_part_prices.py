@@ -12,7 +12,7 @@ from db import db  # nopep8
 from app import app  # nopep8
 
 from models.element import ElementModel, ElementPriceModel  # nopep8
-from models.part import PartModel  # nopep8
+from models.part import PartModel, PartColorFrequencyModel  # nopep8
 
 
 def toDesignId(nbr):
@@ -60,12 +60,14 @@ with app.app_context():
     element_prices = db.session.query(ElementPriceModel.element_id)
 
     element_list = db.session.query(
-        PartModel.part_num,
-        ElementModel.element_id
+        ElementModel.element_id,
+        PartModel.part_num
     ).join(
-        ElementModel,
-        PartModel.id == ElementModel.part_id,
-        isouter=True
+        PartColorFrequencyModel,
+        ElementModel.part_color_frequency_id == PartColorFrequencyModel.id
+    ).join(
+        PartModel,
+        PartColorFrequencyModel.part_id == PartModel.id
     ).filter(and_(
         PartModel.part_num.notlike('0%'),
         PartModel.part_cat_id.notin_([58]),
@@ -73,10 +75,10 @@ with app.app_context():
         ElementModel.element_id.notin_(element_prices)
     )).distinct().limit(max_items).all()
 
-    element_list = sorted(element_list, key=lambda x: x[0])
+    element_list = sorted(element_list, key=lambda x: x[1])
     element_dict = {
-        toDesignId(k): [p1[1] for p1 in p]
-        for k, p in itertools.groupby(element_list, lambda x: x[0])
+        toDesignId(k): [p1[0] for p1 in p]
+        for k, p in itertools.groupby(element_list, lambda x: x[1])
     }
     i = 0
     for ele in element_dict.keys():
@@ -91,17 +93,19 @@ with app.app_context():
                 df = pd.DataFrame(resp.json()['bricks'])
                 db_element_ids = element_dict[ele]
                 for index, row in df.iterrows():
-                    if row['itemNumber'] in db_element_ids:
-                        db_element_ids.remove(row['itemNumber'])
+                    if str(row['itemNumber']) in db_element_ids:
+                        db_element_ids.remove(str(row['itemNumber']))
+                    else:
+                        continue
                     price_id = db.session.query(ElementPriceModel.id).filter(
-                        ElementPriceModel.element_id == row['itemNumber']
+                        ElementPriceModel.element_id == str(row['itemNumber'])
                     ).first()
 
                     if price_id is None:
                         i += 1
                         insertPrice(
                             db.session,
-                            row['itemNumber'],
+                            str(row['itemNumber']),
                             1,
                             int(float(row['price']['amount']) * 100)
                         )

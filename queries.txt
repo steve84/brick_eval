@@ -348,14 +348,32 @@ LEFT JOIN latest_score sm ON sm.inventory_id = i_m.id
 GROUP BY i.id, ss.score) AS subq
 WHERE subq.set_score > 0;
 
+CREATE VIEW score_ranks AS
+SELECT sc.inventory_id, subq1.rank AS total_rank, subq2.rank AS theme_rank, subq3.rank AS year_rank FROM (SELECT sc.id, RANK() OVER (ORDER BY sc.score DESC) FROM latest_score sc) subq1
+LEFT JOIN (SELECT sc.id, s.root_theme_id, RANK() OVER (PARTITION BY s.root_theme_id ORDER BY sc.score DESC) FROM latest_score sc
+LEFT JOIN inventories i ON i.id = sc.inventory_id
+LEFT JOIN sets s ON s.id = i.set_id) subq2 ON subq2.id = subq1.id
+LEFT JOIN (SELECT sc.id, s.year_of_publication, RANK() OVER (PARTITION BY s.year_of_publication ORDER BY sc.score DESC) FROM latest_score sc
+LEFT JOIN inventories i ON i.id = sc.inventory_id
+LEFT JOIN sets s ON s.id = i.set_id) subq3 ON subq3.id = subq1.id
+LEFT JOIN latest_score sc ON sc.id = subq1.id;
 
-SELECT * FROM (SELECT s.set_num, s.name, s.year_of_publication, s.eol, s.retail_price, t_root.name, t.name, ip.varying_parts, ip.total_parts, ip.num_of_stickers > 0 AS has_stickers, m.num_figs, m.dist_num_figs, m.exclusive_figs, iss.set_score, iss.avg_minifig_score FROM (select * from inventories where is_latest = TRUE and set_id IS NOT NULL) i
+CREATE VIEW part_distribution AS
+SELECT i.id, COUNT(*) FILTER (WHERE pcf.total_amount = 1) AS num_unique_parts, COUNT(*) FILTER (WHERE pcf.total_amount <= 10) AS num_part_occurence_10, COUNT(*) FILTER (WHERE pcf.total_amount <= 50) AS num_part_occurence_50 FROM (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id IS NOT NULL) i
+LEFT JOIN inventory_parts ip ON ip.inventory_id = i.id
+LEFT JOIN part_color_frequencies pcf ON pcf.id = ip.part_color_frequency_id
+GROUP BY i.id;
+
+
+SELECT * FROM (SELECT s.set_num, s.name, s.year_of_publication, s.eol, s.retail_price, t_root.name, t.name, ip.varying_parts, ip.total_parts, ip.num_of_stickers > 0 AS has_stickers, m.num_figs, m.dist_num_figs, m.exclusive_figs, iss.set_score, sr.total_rank, sr.theme_rank, sr.year_rank, pd.num_unique_parts, pd.num_part_occurence_10, pd.num_part_occurence_50, iss.avg_minifig_score FROM (select * from inventories where is_latest = TRUE and set_id IS NOT NULL) i
 LEFT JOIN sets s ON s.id = i.set_id
 LEFT JOIN themes t_root ON t_root.id = s.root_theme_id
 LEFT JOIN themes t ON t.id = s.theme_id
 LEFT JOIN inventory_part_stats ip ON ip.inventory_id = i.id
 LEFT JOIN minifig_stats m ON m.inventory_id = i.id
 LEFT JOIN inventory_score_stats iss ON iss.inventory_id = i.id
+LEFT JOIN score_ranks sr ON sr.inventory_id = i.id
+LEFT JOIN part_distribution pd ON pd.id = i.id
 WHERE ip.total_parts > 0) as subq
 ORDER BY subq.year_of_publication DESC;
 

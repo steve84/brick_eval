@@ -59,3 +59,4 @@ class PartColorFrequencyModel(db.Model):
     total_amount = Column(Integer, nullable=False, server_default='0')
 
     part = db.relationship('PartModel')
+    color = db.relationship('ColorModel')

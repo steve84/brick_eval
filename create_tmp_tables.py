@@ -14,30 +14,32 @@ from ddlgenerator.ddlgenerator import Table
 export_dir = 'exports/'
 old_export_dir = 'exports_old/'
 
-# if not os.path.exists(export_dir) or not os.path.isdir(export_dir):
-#     os.mkdir(export_dir)
+database_name = input('Define database name (default brick_eval): ') or 'brick_eval'
 
-# if not os.path.exists(old_export_dir) or not os.path.isdir(old_export_dir):
-#     os.mkdir(old_export_dir)
+if not os.path.exists(export_dir) or not os.path.isdir(export_dir):
+    os.mkdir(export_dir)
+
+if not os.path.exists(old_export_dir) or not os.path.isdir(old_export_dir):
+    os.mkdir(old_export_dir)
 
 
-# for f in os.listdir(export_dir):
-#     src_full_path = '%s%s' % (export_dir, f)
-#     trgt_full_path = '%s%s' % (old_export_dir, f)
-#     src_creation_date = datetime.utcfromtimestamp(
-#         os.path.getctime(src_full_path)
-#     )
-#     src_creation_date_str = str(src_creation_date.date())
-#     src_creation_date_str = src_creation_date_str.replace('-', '_')
-#     trgt_name = '%s.%s' % (trgt_full_path, src_creation_date_str)
-#     shutil.copy2(src_full_path, trgt_name)
-#     os.remove(src_full_path)
+for f in os.listdir(export_dir):
+    src_full_path = '%s%s' % (export_dir, f)
+    trgt_full_path = '%s%s' % (old_export_dir, f)
+    src_creation_date = datetime.utcfromtimestamp(
+        os.path.getctime(src_full_path)
+    )
+    src_creation_date_str = str(src_creation_date.date())
+    src_creation_date_str = src_creation_date_str.replace('-', '_')
+    trgt_name = '%s.%s' % (trgt_full_path, src_creation_date_str)
+    shutil.copy2(src_full_path, trgt_name)
+    os.remove(src_full_path)
 
-# subprocess.run([
-#     'curl',
-#     'https://rebrickable.com/media/downloads/{colors,elements,inventories,inventory_minifigs,inventory_parts,inventory_sets,minifigs,part_categories,part_relationships,parts,sets,themes}.csv.gz',
-#     '-o',
-#     '%s#1.csv.gz' % export_dir])
+subprocess.run([
+    'curl',
+    'https://rebrickable.com/media/downloads/{colors,elements,inventories,inventory_minifigs,inventory_parts,inventory_sets,minifigs,part_categories,part_relationships,parts,sets,themes}.csv.gz',
+    '-o',
+    '%s#1.csv.gz' % export_dir])
 
 
 gz_files = [
@@ -48,9 +50,8 @@ db = psycopg2.connect(user="postgres",
                       password="postgres",
                       host="127.0.0.1",
                       port="5432",
-                      database="brick_eval")
+                      database=database_name)
 
-import pdb;pdb.set_trace()
 for gz_file in gz_files:
     # define table name
     file_name = gz_file.split('exports/')[1]

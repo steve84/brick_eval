@@ -374,6 +374,43 @@ LEFT JOIN minifig_stats m ON m.inventory_id = i.id
 LEFT JOIN inventory_score_stats iss ON iss.inventory_id = i.id
 LEFT JOIN score_ranks sr ON sr.inventory_id = i.id
 LEFT JOIN part_distribution pd ON pd.id = i.id
-WHERE ip.total_parts > 0) as subq
+WHERE ip.total_parts > 0) AS subq
 ORDER BY subq.year_of_publication DESC;
 
+CREATE OR REPLACE VIEW v_inventory_parts AS
+SELECT
+ip.id,
+ip.inventory_id,
+p.name,
+p.part_num,
+p.part_material,
+ip.is_spare,
+c.name AS color_name,
+c.is_trans,
+c.rgb,
+ip.quantity,
+pcf.total_amount,
+e.element_id
+FROM inventory_parts ip
+LEFT JOIN part_color_frequencies pcf ON pcf.id = ip.part_color_frequency_id
+LEFT JOIN parts p ON p.id = pcf.part_id
+LEFT JOIN colors c ON c.id = pcf.color_id
+LEFT JOIN (SELECT part_color_frequency_id, max(id) AS element_id FROM part_color_frequency_element_rel GROUP BY part_color_frequency_id) e ON e.part_color_frequency_id = pcf.id;
+
+CREATE OR REPLACE VIEW v_sets AS 
+SELECT
+s.id,
+s.set_num,
+s.name,
+s.year_of_publication,
+s.num_parts,
+s.eol,
+s.retail_price,
+sc.score,
+rt.name AS root_theme,
+t.name AS theme,
+t.id AS theme_id
+FROM sets s
+LEFT JOIN scores sc ON sc.id = s.score_id
+LEFT JOIN themes rt ON rt.id = s.root_theme_id
+LEFT JOIN themes t ON t.id = s.theme_id;

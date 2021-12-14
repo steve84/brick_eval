@@ -60,10 +60,6 @@ class InventoryPartModel(db.Model):
                  'part_color_frequency_id', 'is_spare', unique=True),
         db.Index('inventory_part_index_1',
                  'inventory_id', 'part_color_frequency_id'),
-        db.ForeignKeyConstraint(
-            ['part_color_frequency_id'],
-            ['elements.part_color_frequency_id']
-        ),
     )
 
     id = Column(Integer, primary_key=True)
@@ -75,12 +71,23 @@ class InventoryPartModel(db.Model):
     is_spare = Column(Boolean, nullable=False)
 
     part_color_frequency = db.relationship('PartColorFrequencyModel')
-    elements = db.relationship(
-        'ElementModel',
-        viewonly=True,
-        uselist=True,
-        primaryjoin="InventoryPartModel.part_color_frequency_id==ElementModel.part_color_frequency_id"
-    )
+
+
+class VInventoryPartModel(db.Model):
+    __tablename__ = 'v_inventory_parts'
+
+    id = Column(Integer, primary_key=True)
+    inventory_id = Column(Integer, nullable=False)
+    part_num = Column(Text, nullable=False, unique=True)
+    name = Column(Text, nullable=False)
+    part_material = Column(Text, nullable=False)
+    is_spare = Column(Boolean, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    color_name = Column(Text, nullable=False)
+    rgb = Column(Text, nullable=False)
+    is_trans = Column(Boolean, nullable=False)
+    total_amount = Column(Integer, nullable=False)
+    element_id = Column(Integer)
 
 
 class InventorySetModel(db.Model):

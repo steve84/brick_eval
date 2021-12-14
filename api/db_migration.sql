@@ -38,28 +38,31 @@ SELECT element_id, provider_id, price FROM element_prices;
 
 
 -- Delete queries --
-TRUNCATE colors, minifigs, part_categories, themes, sets, parts, elements, part_color_frequencies, inventories, part_relationships, inventory_minifigs, inventory_sets, inventory_parts, minifig_inventory_rel, set_inventory_rel, scores, element_prices, statistics CASCADE;
+TRUNCATE
+colors, minifigs, part_categories, themes, sets, parts, part_color_frequency_element_rel, part_color_frequencies,
+inventories, part_relationships, inventory_minifigs, inventory_sets, inventory_parts,
+minifig_inventory_rel, set_inventory_rel, scores, element_prices, statistics CASCADE;
 
 -- If there are ddl changes
 
--- DROP TABLE colors;
--- DROP TABLE elements;
--- DROP TABLE inventories;
--- DROP TABLE inventory_minifigs;
--- DROP TABLE inventory_parts;
--- DROP TABLE inventory_sets;
--- DROP TABLE minifig_inventory_rel;
--- DROP TABLE minifigs;
--- DROP TABLE part_categories;
--- DROP TABLE part_color_frequencies;
--- DROP TABLE part_relationships;
--- DROP TABLE parts;
--- DROP TABLE scores;
--- DROP TABLE set_inventory_rel;
--- DROP TABLE sets;
--- DROP TABLE statistics;
--- DROP TABLE themes;
--- DROP TABLE element_prices;
+-- DROP TABLE colors CASCADE;
+-- DROP TABLE part_color_frequency_element_rel CASCADE;
+-- DROP TABLE inventories CASCADE;
+-- DROP TABLE inventory_minifigs CASCADE;
+-- DROP TABLE inventory_parts CASCADE;
+-- DROP TABLE inventory_sets CASCADE;
+-- DROP TABLE minifig_inventory_rel CASCADE;
+-- DROP TABLE minifigs CASCADE;
+-- DROP TABLE part_categories CASCADE;
+-- DROP TABLE part_color_frequencies CASCADE;
+-- DROP TABLE part_relationships CASCADE;
+-- DROP TABLE parts CASCADE;
+-- DROP TABLE scores CASCADE;
+-- DROP TABLE set_inventory_rel CASCADE;
+-- DROP TABLE sets CASCADE;
+-- DROP TABLE statistics CASCADE;
+-- DROP TABLE themes CASCADE;
+-- DROP TABLE element_prices CASCADE;
 
 -- Start flask server to create tables
 
@@ -106,12 +109,12 @@ INSERT INTO inventory_sets (inventory_id, set_id, quantity)
 SELECT inventory_id, s.id, quantity FROM inventory_sets_tmp t
 LEFT JOIN sets s ON s.set_num = t.set_num;
 
-INSERT INTO elements (element_id, part_color_frequency_id)
-SELECT e.element_id, pcf.id FROM elements_tmp e
+INSERT INTO part_color_frequency_element_rel (id, part_color_frequency_id)
+SELECT e.element_id::numeric, pcf.id FROM elements_tmp e
 LEFT JOIN parts p ON e.part_num = p.part_num
 LEFT JOIN colors c ON e.color_id = c.id
 LEFT JOIN part_color_frequencies pcf ON p.id = pcf.part_id AND c.id = pcf.color_id
-WHERE pcf.id IS NOT NULL;
+WHERE pcf.id IS NOT NULL AND e.element_id !~ '[^0-9]';
 
 INSERT INTO inventory_parts (inventory_id, part_color_frequency_id, is_spare, quantity)
 SELECT inventory_id, pcf.id, is_spare, quantity FROM inventory_parts_tmp t
@@ -119,32 +122,6 @@ LEFT JOIN parts p ON t.part_num = p.part_num
 LEFT JOIN colors c ON t.color_id = c.id
 LEFT JOIN part_color_frequencies pcf ON p.id = pcf.part_id AND c.id = pcf.color_id
 WHERE pcf.id IS NOT NULL;
-
---- Insert check
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM colors) c, (SELECT count(*) AS amount FROM colors_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM minifigs) c, (SELECT count(*) AS amount FROM minifigs_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM part_categories) c, (SELECT count(*) AS amount FROM part_categories_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM themes) c, (SELECT count(*) AS amount FROM themes_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM sets) c, (SELECT count(*) AS amount FROM sets_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM parts) c, (SELECT count(*) AS amount FROM parts_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM elements) c, (SELECT count(*) AS amount FROM elements_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventories) c, (SELECT count(*) AS amount FROM inventories_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM part_relationships) c, (SELECT count(*) AS amount FROM part_relationships_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_minifigs) c, (SELECT count(*) AS amount FROM inventory_minifigs_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_sets) c, (SELECT count(*) AS amount FROM inventory_sets_tmp) ct
--- UNION ALL
--- SELECT c.amount = ct.amount FROM (SELECT count(*) AS amount FROM inventory_parts) c, (SELECT count(*) AS amount FROM inventory_parts_tmp) ct;
-
 
 -- Generated FROM base tables
 INSERT INTO minifig_inventory_rel (inventory_id, inventory_minifig_id, quantity)
@@ -247,7 +224,7 @@ LEFT JOIN inventories i ON i.id = mir.inventory_id AND i.is_latest = TRUE
 WHERE tsc.fig_num IS NOT NULL AND i.id IS NOT NULL;
 
 INSERT INTO element_prices (element_id, provider_id, price)
-SELECT element_id, provider_id, price FROM tmp_element_prices where element_id in (select element_id from elements);
+SELECT element_id, provider_id, price FROM tmp_element_prices where element_id in (select id from part_color_frequency_element_rel);
 
 -- Set score ids
 CREATE TABLE tmp_act_set_score (
@@ -257,8 +234,7 @@ CREATE TABLE tmp_act_set_score (
 
 CREATE UNIQUE INDEX tmp_act_set_index ON tmp_act_set_score (set_id);
 
-DROP VIEW IF EXISTS v_sets_scores;
-CREATE VIEW v_sets_scores AS
+CREATE OR REPLACE VIEW v_sets_scores AS
     SELECT DISTINCT s.id AS set_id, sc.id AS score_id FROM (
         SELECT * FROM scores WHERE id IN (SELECT DISTINCT
         first_value(id) OVER (PARTITION BY inventory_id ORDER BY calc_date DESC)
@@ -284,8 +260,7 @@ CREATE TABLE tmp_act_minifig_score (
 
 CREATE UNIQUE INDEX tmp_act_minifig_index ON tmp_act_minifig_score (minifig_id);
 
-DROP VIEW IF EXISTS v_inventory_minifigs_scores;
-CREATE VIEW v_inventory_minifigs_scores AS
+CREATE OR REPLACE VIEW v_inventory_minifigs_scores AS
     SELECT DISTINCT im.id AS minifig_id, sc.id AS score_id FROM (
         SELECT * FROM scores WHERE id IN (SELECT DISTINCT
         first_value(id) OVER (PARTITION BY inventory_id ORDER BY calc_date DESC)
@@ -308,8 +283,7 @@ DROP VIEW v_inventory_minifigs_scores;
 DROP TABLE tmp_act_minifig_score;
 
 -- Set root theme ids
-DROP VIEW IF EXISTS v_root_theme;
-CREATE VIEW v_root_theme AS
+CREATE OR REPLACE VIEW v_root_theme AS
 SELECT s.id, COALESCE(t3.id, t2.id, t1.id) AS root_theme_id
 FROM sets s
 LEFT JOIN themes t1 ON s.theme_id = t1.id
@@ -322,9 +296,7 @@ UPDATE sets SET root_theme_id = (
 DROP VIEW v_root_theme;
 
 -- Update minifig properties
-DROP VIEW IF EXISTS v_minifig_has_unique_part;
-
-CREATE VIEW v_minifig_has_unique_part AS
+CREATE OR REPLACE VIEW v_minifig_has_unique_part AS
 SELECT m.id, MIN(pcf.total_amount) = 1 AS has_unique_part FROM minifigs m
 LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
 LEFT JOIN minifig_inventory_rel mir ON im.id = mir.inventory_minifig_id
@@ -333,9 +305,7 @@ LEFT JOIN (SELECT inventory_id, part_color_frequency_id, sum(quantity) AS quanti
 LEFT JOIN part_color_frequencies pcf ON ip.part_color_frequency_id = pcf.id
 GROUP BY m.id;
 
-DROP VIEW IF EXISTS v_minifig_year_of_publication;
-
-CREATE VIEW v_minifig_year_of_publication AS
+CREATE OR REPLACE VIEW v_minifig_year_of_publication AS
 SELECT m.id, MIN(s.year_of_publication) AS year_of_publication FROM minifigs m
 LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
 LEFT JOIN inventories i ON i.id = im.inventory_id and i.is_latest = TRUE

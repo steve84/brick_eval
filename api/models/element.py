@@ -7,33 +7,33 @@ from sqlalchemy import (
 from db import db
 
 
-class ElementModel(db.Model):
-    __tablename__ = 'elements'
-    __table_args__ = (
-        db.Index('element_index', 'element_id',
-                 'part_color_frequency_id', unique=True),
-    )
-
-    id = Column(Integer, primary_key=True)
-    element_id = Column(Text, nullable=False, unique=True)
-    part_color_frequency_id = Column(Integer, db.ForeignKey(
-        'part_color_frequencies.id'), nullable=False)
-
-    prices = db.relationship('ElementPriceModel')
-
-
 class ElementPriceModel(db.Model):
     __tablename__ = 'element_prices'
     __table_args__ = (
-        db.Index('element_price_index', 'element_id',
+        db.Index('element_price_index', 'id',
                  'provider_id', unique=True),
     )
 
     id = Column(Integer, primary_key=True)
     element_id = Column(
-        Text,
-        db.ForeignKey('elements.element_id'),
+        Integer,
+        db.ForeignKey('part_color_frequency_element_rel.id'),
         nullable=False
     )
     provider_id = Column(Integer, nullable=False)
     price = Column(Integer, nullable=False)
+
+
+class PartColorFrequencyElementRelation(db.Model):
+    __tablename__ = 'part_color_frequency_element_rel'
+    __table_args__ = (
+        db.Index('pcf_element_index', 'id',
+                 'part_color_frequency_id', unique=True),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    part_color_frequency_id = db.Column(db.Integer,
+                                        db.ForeignKey('part_color_frequencies.id'),
+                                        nullable=False)
+
+    part_color_frequency = db.relationship('PartColorFrequencyModel')

@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Float,
     Integer,
     Text,
     String
@@ -25,3 +26,18 @@ class SetModel(db.Model):
 
     theme = db.relationship('ThemeModel', foreign_keys=[theme_id])
     score = db.relationship('ScoreModel')
+
+class VSetModel(db.Model):
+    __tablename__ = 'v_sets'
+
+    id = Column(Integer, primary_key=True)
+    set_num = Column(Text, nullable=False, unique=True)
+    name = Column(Text, nullable=False)
+    year_of_publication = Column(Integer, nullable=False)
+    theme = Column(Text, nullable=False)
+    theme_id = Column(Integer, nullable=False)
+    root_theme = Column(Text, nullable=False)
+    num_parts = Column(Integer, nullable=False)
+    eol = Column(String(2))
+    retail_price = Column(Integer)
+    score = Column(Float)

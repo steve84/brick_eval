@@ -74,8 +74,9 @@ for gz_file in gz_files:
         table_name=table_name,
         varying_length_text=True)
     # generate sql script
-    sql = table.sql('postgresql', inserts=True)
-    # avoid multiple insert statements for sqlite
+    sql = 'DROP TABLE IF EXISTS %s;' % table_name
+    sql += table.sql('postgresql', inserts=True)
+    # avoid multiple insert statements
     sql = re.sub(';\nINSERT INTO %s ((.*)) VALUES ' % table_name, ',', sql)
     # write to db
     cursor = db.cursor()

@@ -1,0 +1,4 @@
+ddlgenerator
+pandas
+sqlacodegen
+sqlalchemy

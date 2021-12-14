@@ -11,7 +11,7 @@ sys.path.insert(0, '../')
 from db import db  # nopep8
 from app import app  # nopep8
 
-from models.element import ElementModel, ElementPriceModel  # nopep8
+from models.element import PartColorFrequencyElementRelation, ElementPriceModel  # nopep8
 from models.part import PartModel, PartColorFrequencyModel  # nopep8
 
 
@@ -60,19 +60,19 @@ with app.app_context():
     element_prices = db.session.query(ElementPriceModel.element_id)
 
     element_list = db.session.query(
-        ElementModel.element_id,
+        PartColorFrequencyElementRelation.id,
         PartModel.part_num
     ).join(
         PartColorFrequencyModel,
-        ElementModel.part_color_frequency_id == PartColorFrequencyModel.id
+        PartColorFrequencyElementRelation.part_color_frequency_id == PartColorFrequencyModel.id
     ).join(
         PartModel,
         PartColorFrequencyModel.part_id == PartModel.id
     ).filter(and_(
         PartModel.part_num.notlike('0%'),
         PartModel.part_cat_id.notin_([58]),
-        ElementModel.element_id != None,  # nopep8
-        ElementModel.element_id.notin_(element_prices)
+        PartColorFrequencyElementRelation.id != None,  # nopep8
+        PartColorFrequencyElementRelation.id.notin_(element_prices)
     )).distinct().limit(max_items).all()
 
     element_list = sorted(element_list, key=lambda x: x[1])

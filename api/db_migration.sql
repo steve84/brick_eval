@@ -1,72 +1,8 @@
--- Generate base tmp tables by executing create_tmp_tables.py
-
--- Create tmp tables to store generated data --
-CREATE TABLE tmp_sets_info (
-	set_num TEXT NOT NULL UNIQUE,
-	eol VARCHAR(1) DEFAULT -1,
-	retail_price INTEGER
-);
-
-CREATE TABLE tmp_scores (
-	set_num TEXT,
-	fig_num TEXT,
-	score FLOAT NOT NULL,
-	calc_date DATE NOT NULL
-);
-
-CREATE TABLE tmp_element_prices (
-	element_id TEXT NOT NULL,
-	provider_id INTEGER NOT NULL,
-	price INTEGER NOT NULL
-);
-
-
--- Insert generated data into tmp tables
-INSERT INTO tmp_sets_info
-SELECT set_num, eol, retail_price FROM sets WHERE retail_price IS NOT NULL OR eol <> '-1';
-
-INSERT INTO tmp_scores
-SELECT DISTINCT s.set_num, m.fig_num, sc.score, sc.calc_date FROM scores sc
-LEFT JOIN inventories i ON sc.inventory_id = i.id
-LEFT JOIN minifig_inventory_rel mir ON i.id = mir.inventory_id
-LEFT JOIN inventory_minifigs im ON mir.inventory_minifig_id = im.id
-LEFT JOIN sets s ON i.set_id = s.id
-LEFT JOIN minifigs m ON im.fig_id = m.id;
-
-INSERT INTO tmp_element_prices
-SELECT element_id, provider_id, price FROM element_prices;
-
-
--- Delete queries --
-TRUNCATE
-colors, minifigs, part_categories, themes, sets, parts, part_color_frequency_element_rel, part_color_frequencies,
-inventories, part_relationships, inventory_minifigs, inventory_sets, inventory_parts,
-minifig_inventory_rel, set_inventory_rel, scores, element_prices, statistics CASCADE;
-
--- If there are ddl changes
-
--- DROP TABLE colors CASCADE;
--- DROP TABLE part_color_frequency_element_rel CASCADE;
--- DROP TABLE inventories CASCADE;
--- DROP TABLE inventory_minifigs CASCADE;
--- DROP TABLE inventory_parts CASCADE;
--- DROP TABLE inventory_sets CASCADE;
--- DROP TABLE minifig_inventory_rel CASCADE;
--- DROP TABLE minifigs CASCADE;
--- DROP TABLE part_categories CASCADE;
--- DROP TABLE part_color_frequencies CASCADE;
--- DROP TABLE part_relationships CASCADE;
--- DROP TABLE parts CASCADE;
--- DROP TABLE scores CASCADE;
--- DROP TABLE set_inventory_rel CASCADE;
--- DROP TABLE sets CASCADE;
--- DROP TABLE statistics CASCADE;
--- DROP TABLE themes CASCADE;
--- DROP TABLE element_prices CASCADE;
-
--- Start flask server to create tables
-
--- Insert queries --
+DROP TABLE IF EXISTS tmp_part_freq;
+DROP TABLE IF EXISTS tmp_act_set_score;
+DROP TABLE IF EXISTS tmp_act_minifig_score;
+DROP TABLE IF EXISTS tmp_minifig_props;
+--- Insert queries --
 
 -- Base tables
 INSERT INTO colors (id, name, rgb, is_trans)
@@ -109,12 +45,12 @@ INSERT INTO inventory_sets (inventory_id, set_id, quantity)
 SELECT inventory_id, s.id, quantity FROM inventory_sets_tmp t
 LEFT JOIN sets s ON s.set_num = t.set_num;
 
-INSERT INTO part_color_frequency_element_rel (id, part_color_frequency_id)
-SELECT e.element_id::numeric, pcf.id FROM elements_tmp e
+INSERT INTO part_color_frequency_element_rel (element_id, part_color_frequency_id)
+SELECT e.element_id, pcf.id FROM elements_tmp e
 LEFT JOIN parts p ON e.part_num = p.part_num
 LEFT JOIN colors c ON e.color_id = c.id
 LEFT JOIN part_color_frequencies pcf ON p.id = pcf.part_id AND c.id = pcf.color_id
-WHERE pcf.id IS NOT NULL AND e.element_id !~ '[^0-9]';
+WHERE pcf.id IS NOT NULL;
 
 INSERT INTO inventory_parts (inventory_id, part_color_frequency_id, is_spare, quantity)
 SELECT inventory_id, pcf.id, is_spare, quantity FROM inventory_parts_tmp t
@@ -136,8 +72,7 @@ LEFT JOIN inventories_tmp i ON s.set_num = i.set_num;
 
 -- Update inventories table (is_latest)
 
-DROP VIEW IF EXISTS v_latest_inventory;
-CREATE VIEW v_latest_inventory as
+CREATE OR REPLACE VIEW v_latest_inventory as
 SELECT i.id FROM (SELECT * FROM inventories WHERE set_id IS NOT NULL) i
 LEFT JOIN (SELECT set_id, max(version) AS max_version FROM inventories GROUP BY set_id) AS max_i ON i.set_id = max_i.set_id AND i.version = max_i.max_version
 WHERE max_i.set_id IS NOT NULL
@@ -156,8 +91,7 @@ UPDATE inventories SET is_latest = FALSE WHERE inventories.id NOT IN (SELECT id 
 
 -- Update part_color_frequencies table (quantity)
 
-DROP VIEW IF EXISTS v_total_quantities;
-CREATE VIEW v_total_quantities as
+CREATE OR REPLACE VIEW v_total_quantities as
 SELECT subq.part_color_frequency_id, sum(subq.quantity) AS quantity
 FROM (SELECT ip.part_color_frequency_id, sum(ip.quantity) AS quantity
 FROM (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id IS NOT NULL) i
@@ -191,11 +125,11 @@ WHERE
         WHERE tmp_part_freq.part_color_frequency_id = pcf.id
     );
 
-DROP TABLE tmp_part_freq;
+DROP TABLE IF EXISTS tmp_part_freq;
 
 
-DROP VIEW v_total_quantities;
-DROP VIEW v_latest_inventory;
+DROP VIEW IF EXISTS v_total_quantities;
+DROP VIEW IF EXISTS v_latest_inventory;
 
 -- Update generated data --
 UPDATE sets
@@ -224,7 +158,9 @@ LEFT JOIN inventories i ON i.id = mir.inventory_id AND i.is_latest = TRUE
 WHERE tsc.fig_num IS NOT NULL AND i.id IS NOT NULL;
 
 INSERT INTO element_prices (element_id, provider_id, price)
-SELECT element_id, provider_id, price FROM tmp_element_prices where element_id in (select id from part_color_frequency_element_rel);
+SELECT pcfer.id, tep.provider_id, tep.price FROM tmp_element_prices tep
+LEFT JOIN part_color_frequency_element_rel pcfer on pcfer.element_id = tep.element_id
+WHERE pcfer.id IS NOT NULL;
 
 -- Set score ids
 CREATE TABLE tmp_act_set_score (
@@ -249,8 +185,8 @@ INSERT INTO tmp_act_set_score
 select * from v_sets_scores;
 
 UPDATE sets SET score_id = (SELECT score_id FROM tmp_act_set_score WHERE tmp_act_set_score.set_id = sets.id);
-DROP VIEW v_sets_scores;
-DROP TABLE tmp_act_set_score;
+DROP VIEW IF EXISTS v_sets_scores;
+DROP TABLE IF EXISTS tmp_act_set_score;
 
 
 CREATE TABLE tmp_act_minifig_score (
@@ -279,8 +215,8 @@ UPDATE inventory_minifigs SET score_id = (
     SELECT score_id FROM tmp_act_minifig_score WHERE
     tmp_act_minifig_score.minifig_id = inventory_minifigs.id
 );
-DROP VIEW v_inventory_minifigs_scores;
-DROP TABLE tmp_act_minifig_score;
+DROP VIEW IF EXISTS v_inventory_minifigs_scores;
+DROP TABLE IF EXISTS tmp_act_minifig_score;
 
 -- Set root theme ids
 CREATE OR REPLACE VIEW v_root_theme AS
@@ -293,7 +229,7 @@ UPDATE sets SET root_theme_id = (
     SELECT root_theme_id FROM v_root_theme WHERE
     v_root_theme.id = sets.id
 );
-DROP VIEW v_root_theme;
+DROP VIEW IF EXISTS v_root_theme;
 
 -- Update minifig properties
 CREATE OR REPLACE VIEW v_minifig_has_unique_part AS
@@ -328,22 +264,63 @@ UPDATE minifigs SET (has_unique_part, year_of_publication) = (
     tmp_minifig_props.id = minifigs.id
 );
 
-DROP TABLE tmp_minifig_props;
-DROP VIEW v_minifig_has_unique_part;
-DROP VIEW v_minifig_year_of_publication;
+DROP TABLE IF EXISTS tmp_minifig_props;
 
-DROP TABLE colors_tmp;
-DROP TABLE elements_tmp;
-DROP TABLE inventories_tmp;
-DROP TABLE inventory_minifigs_tmp;
-DROP TABLE inventory_parts_tmp;
-DROP TABLE inventory_sets_tmp;
-DROP TABLE minifigs_tmp;
-DROP TABLE part_categories_tmp;
-DROP TABLE part_relationships_tmp;
-DROP TABLE parts_tmp;
-DROP TABLE sets_tmp;
-DROP TABLE themes_tmp;
-DROP TABLE tmp_sets_info;
-DROP TABLE tmp_scores;
-DROP TABLE tmp_element_prices;
+
+-- Create views for ui
+CREATE OR REPLACE VIEW v_inventory_parts AS
+SELECT
+ip.id,
+ip.inventory_id,
+p.name,
+p.part_num,
+p.part_material,
+ip.is_spare,
+c.name AS color_name,
+c.is_trans,
+c.rgb,
+ip.quantity,
+pcf.total_amount,
+e.element_id
+FROM inventory_parts ip
+LEFT JOIN part_color_frequencies pcf ON pcf.id = ip.part_color_frequency_id
+LEFT JOIN parts p ON p.id = pcf.part_id
+LEFT JOIN colors c ON c.id = pcf.color_id
+LEFT JOIN (select DISTINCT part_color_frequency_id, first_value(element_id) OVER (PARTITION BY part_color_frequency_id ORDER BY id DESC) AS element_id from part_color_frequency_element_rel) e ON e.part_color_frequency_id = pcf.id;
+
+CREATE OR REPLACE VIEW v_sets AS 
+SELECT
+s.id,
+s.set_num,
+s.name,
+s.year_of_publication,
+s.num_parts,
+s.eol,
+s.retail_price,
+sc.score,
+rt.name AS root_theme,
+t.name AS theme,
+t.id AS theme_id
+FROM sets s
+LEFT JOIN scores sc ON sc.id = s.score_id
+LEFT JOIN themes rt ON rt.id = s.root_theme_id
+LEFT JOIN themes t ON t.id = s.theme_id;
+
+DROP VIEW IF EXISTS v_minifig_has_unique_part;
+DROP VIEW IF EXISTS v_minifig_year_of_publication;
+
+DROP TABLE IF EXISTS colors_tmp;
+DROP TABLE IF EXISTS elements_tmp;
+DROP TABLE IF EXISTS inventories_tmp;
+DROP TABLE IF EXISTS inventory_minifigs_tmp;
+DROP TABLE IF EXISTS inventory_parts_tmp;
+DROP TABLE IF EXISTS inventory_sets_tmp;
+DROP TABLE IF EXISTS minifigs_tmp;
+DROP TABLE IF EXISTS part_categories_tmp;
+DROP TABLE IF EXISTS part_relationships_tmp;
+DROP TABLE IF EXISTS parts_tmp;
+DROP TABLE IF EXISTS sets_tmp;
+DROP TABLE IF EXISTS themes_tmp;
+DROP TABLE IF EXISTS tmp_sets_info;
+DROP TABLE IF EXISTS tmp_scores;
+DROP TABLE IF EXISTS tmp_element_prices;

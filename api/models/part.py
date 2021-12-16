@@ -60,4 +60,3 @@ class PartColorFrequencyModel(db.Model):
 
     part = db.relationship('PartModel')
     color = db.relationship('ColorModel')
-    elements = db.relationship('PartColorFrequencyElementRelation')

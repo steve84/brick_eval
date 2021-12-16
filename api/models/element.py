@@ -32,8 +32,11 @@ class PartColorFrequencyElementRelation(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    element_id = Column(Text, nullable=False, unique=True)
     part_color_frequency_id = db.Column(db.Integer,
                                         db.ForeignKey('part_color_frequencies.id'),
                                         nullable=False)
 
-    part_color_frequency = db.relationship('PartColorFrequencyModel')
+    part_color_frequency = db.relationship('PartColorFrequencyModel',
+                                           backref=db.backref('elements'))
+    element_prices = db.relationship('ElementPriceModel')

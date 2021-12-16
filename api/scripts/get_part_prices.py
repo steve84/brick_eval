@@ -30,11 +30,19 @@ def insertPrice(session, id, provider_id, price):
     print(
         'Insert element %s' % id
     )
-    session.add(ElementPriceModel(
-        element_id=id,
-        provider_id=provider_id,
-        price=price
-    ))
+
+    element_id = session.query(
+        PartColorFrequencyElementRelation.id
+    ).filter(
+        PartColorFrequencyElementRelation.element_id == id
+    ).first()
+
+    if element_id is not None:
+        session.add(ElementPriceModel(
+            element_id=element_id,
+            provider_id=provider_id,
+            price=price
+        ))
 
 
 parser = argparse.ArgumentParser(
@@ -60,7 +68,7 @@ with app.app_context():
     element_prices = db.session.query(ElementPriceModel.element_id)
 
     element_list = db.session.query(
-        PartColorFrequencyElementRelation.id,
+        PartColorFrequencyElementRelation.element_id,
         PartModel.part_num
     ).join(
         PartColorFrequencyModel,
@@ -95,10 +103,14 @@ with app.app_context():
                 for index, row in df.iterrows():
                     if str(row['itemNumber']) in db_element_ids:
                         db_element_ids.remove(str(row['itemNumber']))
-                    else:
-                        continue
-                    price_id = db.session.query(ElementPriceModel.id).filter(
-                        ElementPriceModel.element_id == str(row['itemNumber'])
+
+                    price_id = db.session.query(
+                        ElementPriceModel.id
+                    ).join(
+                        PartColorFrequencyElementRelation,
+                        ElementPriceModel.element_id == PartColorFrequencyElementRelation.id
+                    ).filter(
+                        PartColorFrequencyElementRelation.element_id == str(row['itemNumber'])
                     ).first()
 
                     if price_id is None:
@@ -110,9 +122,15 @@ with app.app_context():
                             int(float(row['price']['amount']) * 100)
                         )
 
+                # Not found on website, insert -1
                 for db_id in db_element_ids:
-                    price_id = db.session.query(ElementPriceModel.id).filter(
-                        ElementPriceModel.element_id == db_id
+                    price_id = db.session.query(
+                        ElementPriceModel.id
+                    ).join(
+                        PartColorFrequencyElementRelation,
+                        ElementPriceModel.element_id == PartColorFrequencyElementRelation.id
+                    ).filter(
+                        PartColorFrequencyElementRelation.element_id == db_id
                     ).first()
 
                     if price_id is None:

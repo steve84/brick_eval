@@ -395,7 +395,7 @@ FROM inventory_parts ip
 LEFT JOIN part_color_frequencies pcf ON pcf.id = ip.part_color_frequency_id
 LEFT JOIN parts p ON p.id = pcf.part_id
 LEFT JOIN colors c ON c.id = pcf.color_id
-LEFT JOIN (SELECT part_color_frequency_id, max(id) AS element_id FROM part_color_frequency_element_rel GROUP BY part_color_frequency_id) e ON e.part_color_frequency_id = pcf.id;
+LEFT JOIN (select DISTINCT part_color_frequency_id, first_value(element_id) OVER (PARTITION BY part_color_frequency_id ORDER BY id DESC) AS element_id from part_color_frequency_element_rel) e ON e.part_color_frequency_id = pcf.id;
 
 CREATE OR REPLACE VIEW v_sets AS 
 SELECT

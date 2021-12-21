@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_restless import APIManager
 
-from db import db
+from db import app, db
 
 from models.set import SetModel, VSetModel
 from models.color import ColorModel
@@ -28,11 +28,6 @@ from models.theme import ThemeModel
 
 from resources.theme import theme_bp
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@localhost:5432/brick_eval'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['PROPAGATE_EXCEPTIONS'] = True
-app.secret_key = 'brick_eval'
 
 # Do only create real tables (not views)
 CREATE_TABLES = [
@@ -62,8 +57,7 @@ def create_tables():
 
 
 if __name__ == '__main__':
-    db.init_app(app)
-    manager = APIManager(app, flask_sqlalchemy_db=db)
+    manager = APIManager(app, session=db.session)
     manager.create_api(ColorModel, methods=['GET'])
     manager.create_api(ElementPriceModel, methods=['GET'])
     manager.create_api(InventoryModel, methods=['GET'])
@@ -79,5 +73,7 @@ if __name__ == '__main__':
     manager.create_api(VSetModel, methods=['GET'])
     manager.create_api(StatisticModel, methods=['GET'])
     manager.create_api(ThemeModel, methods=['GET'])
+    manager.create_api(MinifigInventoryRelation, methods=[])
+    manager.create_api(InventorySetModel, methods=[])
     manager.app.register_blueprint(theme_bp)
     app.run(port=5000, host='0.0.0.0', debug=True)

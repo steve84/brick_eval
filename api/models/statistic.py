@@ -26,3 +26,5 @@ class StatisticModel(db.Model):
     upper_quartil = Column(Float, nullable=False)
     max_value = Column(Float, nullable=False)
     calc_date = Column(Date, nullable=False)
+
+    theme = db.relationship('ThemeModel')

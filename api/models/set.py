@@ -25,6 +25,7 @@ class SetModel(db.Model):
     root_theme_id = Column(Integer, db.ForeignKey('themes.id'))
 
     theme = db.relationship('ThemeModel', foreign_keys=[theme_id])
+    root_theme = db.relationship('ThemeModel', foreign_keys=[root_theme_id])
     score = db.relationship('ScoreModel')
 
 class VSetModel(db.Model):

@@ -1,4 +1,7 @@
+argparse
 ddlgenerator
 pandas
-sqlacodegen
-sqlalchemy
+psycopg2
+Flask-Restless-NG
+Flask-SQLAlchemy
+Flask-Restful

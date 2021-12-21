@@ -5,7 +5,7 @@ DROP TABLE IF EXISTS tmp_element_prices;
 -- Create tmp tables to store generated data --
 CREATE TABLE tmp_sets_info (
 	set_num TEXT NOT NULL UNIQUE,
-	eol VARCHAR(1) DEFAULT -1,
+	eol VARCHAR(2) DEFAULT -1,
 	retail_price INTEGER
 );
 

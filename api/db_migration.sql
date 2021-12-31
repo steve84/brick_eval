@@ -306,6 +306,37 @@ LEFT JOIN scores sc ON sc.id = s.score_id
 LEFT JOIN themes rt ON rt.id = s.root_theme_id
 LEFT JOIN themes t ON t.id = s.theme_id;
 
+CREATE OR REPLACE VIEW v_scores AS
+select * from (select sc.id, false as is_set, im.id as entity_id, sc.score, sc.calc_date, mf.fig_num as num, mf.name, mf.num_parts, mf.year_of_publication,
+case when sc.score < st.lower_quartil then 1
+when sc.score < st.median then 2
+when sc.score < st.upper_quartil then 3
+else 4 end as rating
+from inventory_minifigs im
+left join scores sc on sc.id = im.score_id
+left join minifigs mf on mf.id = im.fig_id
+left join statistics st on st.is_set = 'f' and st.theme_id is null
+union all
+select sc.id, true as is_set, s.id as entity_id, sc.score, sc.calc_date, s.set_num as num, s.name, s.num_parts, s.year_of_publication,
+case when sc.score < st.lower_quartil then 1
+when sc.score < st.median then 2
+when sc.score < st.upper_quartil then 3
+else 4 end as rating
+from sets s
+left join scores sc on sc.id = s.score_id
+left join statistics st on st.is_set = 't' and st.theme_id is null) as sc
+where sc.id is not null;
+
+CREATE OR REPLACE VIEW v_parts AS
+select pcf.id, pcf.total_amount, c.name as color_name, c.rgb, c.is_trans, p.part_num, p.name as part_name, p.part_material,
+case when p.part_num like '%pr%' then true else false end as is_print,
+pc.name as category_name, pcfr.element_id, ep.price from part_color_frequencies pcf
+left join colors c on c.id = pcf.color_id
+left join parts p on p.id = pcf.part_id
+left join part_categories pc on pc.id = p.part_cat_id
+left join part_color_frequency_element_rel pcfr on pcfr.part_color_frequency_id = pcf.id
+left join element_prices ep on ep.element_id = pcfr.id;
+
 DROP VIEW IF EXISTS v_minifig_has_unique_part;
 DROP VIEW IF EXISTS v_minifig_year_of_publication;
 

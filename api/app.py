@@ -20,9 +20,10 @@ from models.part import (
     PartCategoryModel,
     PartModel,
     PartColorFrequencyModel,
-    PartRelationshipModel
+    PartRelationshipModel,
+    VPartModel
 )
-from models.score import ScoreModel
+from models.score import ScoreModel, VScoreModel
 from models.statistic import StatisticModel
 from models.theme import ThemeModel
 
@@ -66,9 +67,11 @@ if __name__ == '__main__':
     manager.create_api(VInventoryPartModel, methods=['GET'])
     manager.create_api(MinifigModel, methods=['GET'])
     manager.create_api(PartModel, methods=['GET'])
+    manager.create_api(VPartModel, methods=['GET'])
     manager.create_api(PartColorFrequencyElementRelation, methods=['GET'])
     manager.create_api(PartColorFrequencyModel, methods=['GET'])
     manager.create_api(ScoreModel, methods=['GET'])
+    manager.create_api(VScoreModel, methods=['GET'])
     manager.create_api(SetModel, methods=['GET'])
     manager.create_api(VSetModel, methods=['GET'])
     manager.create_api(StatisticModel, methods=['GET'])

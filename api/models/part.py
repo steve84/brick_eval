@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Boolean,
     Integer,
     Text
 )
@@ -60,3 +61,20 @@ class PartColorFrequencyModel(db.Model):
 
     part = db.relationship('PartModel')
     color = db.relationship('ColorModel')
+
+
+class VPartModel(db.Model):
+    __tablename__ = 'v_parts'
+
+    id = Column(Integer, primary_key=True)
+    total_amount = Column(Integer, nullable=False)
+    color_name = Column(Text, nullable=False)
+    rgb = Column(Text, nullable=False)
+    is_trans = Column(Boolean, nullable=False)
+    part_num = Column(Text, nullable=False, unique=True)
+    part_name = Column(Text, nullable=False)
+    part_material = Column(Text, nullable=False)
+    is_print = Column(Boolean, nullable=False)
+    category_name = Column(Text, nullable=False)
+    element_id = Column(Text)
+    price = Column(Integer)

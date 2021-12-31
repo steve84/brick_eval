@@ -80,7 +80,6 @@ def getPrice(data):
 s = requests.Session()
 
 add_filters = tuple()
-add_filters += (SetModel.retail_price == None,)  # nopep8
 if years is not None:
     add_filters += (SetModel.year_of_publication.in_(
         [y for y in map(lambda x: int(x), years)]),)

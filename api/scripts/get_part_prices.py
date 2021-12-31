@@ -39,7 +39,7 @@ def insertPrice(session, id, provider_id, price):
 
     if element_id is not None:
         session.add(ElementPriceModel(
-            element_id=element_id,
+            element_id=element_id[0],
             provider_id=provider_id,
             price=price
         ))

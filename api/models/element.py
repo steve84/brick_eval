@@ -10,7 +10,7 @@ from db import db
 class ElementPriceModel(db.Model):
     __tablename__ = 'element_prices'
     __table_args__ = (
-        db.Index('element_price_index', 'id',
+        db.Index('element_price_index', 'element_id',
                  'provider_id', unique=True),
     )
 

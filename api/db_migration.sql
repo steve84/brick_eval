@@ -71,8 +71,8 @@ LEFT JOIN sets s ON invs.set_id = s.id
 LEFT JOIN inventories_tmp i ON s.set_num = i.set_num;
 
 -- Update inventories table (is_latest)
-
-CREATE OR REPLACE VIEW v_latest_inventory as
+DROP VIEW IF EXISTS v_latest_inventory;
+CREATE VIEW v_latest_inventory as
 SELECT i.id FROM (SELECT * FROM inventories WHERE set_id IS NOT NULL) i
 LEFT JOIN (SELECT set_id, max(version) AS max_version FROM inventories GROUP BY set_id) AS max_i ON i.set_id = max_i.set_id AND i.version = max_i.max_version
 WHERE max_i.set_id IS NOT NULL
@@ -90,8 +90,8 @@ UPDATE inventories SET is_latest = FALSE WHERE inventories.id NOT IN (SELECT id 
 
 
 -- Update part_color_frequencies table (quantity)
-
-CREATE OR REPLACE VIEW v_total_quantities as
+DROP VIEW IF EXISTS v_total_quantities;
+CREATE VIEW v_total_quantities as
 SELECT subq.part_color_frequency_id, sum(subq.quantity) AS quantity
 FROM (SELECT ip.part_color_frequency_id, sum(ip.quantity) AS quantity
 FROM (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id IS NOT NULL) i
@@ -170,7 +170,8 @@ CREATE TABLE tmp_act_set_score (
 
 CREATE UNIQUE INDEX tmp_act_set_index ON tmp_act_set_score (set_id);
 
-CREATE OR REPLACE VIEW v_sets_scores AS
+DROP VIEW IF EXISTS v_sets_scores;
+CREATE VIEW v_sets_scores AS
     SELECT DISTINCT s.id AS set_id, sc.id AS score_id FROM (
         SELECT * FROM scores WHERE id IN (SELECT DISTINCT
         first_value(id) OVER (PARTITION BY inventory_id ORDER BY calc_date DESC)
@@ -196,7 +197,8 @@ CREATE TABLE tmp_act_minifig_score (
 
 CREATE UNIQUE INDEX tmp_act_minifig_index ON tmp_act_minifig_score (minifig_id);
 
-CREATE OR REPLACE VIEW v_inventory_minifigs_scores AS
+DROP VIEW IF EXISTS v_inventory_minifigs_scores;
+CREATE VIEW v_inventory_minifigs_scores AS
     SELECT DISTINCT im.id AS minifig_id, sc.id AS score_id FROM (
         SELECT * FROM scores WHERE id IN (SELECT DISTINCT
         first_value(id) OVER (PARTITION BY inventory_id ORDER BY calc_date DESC)
@@ -219,7 +221,8 @@ DROP VIEW IF EXISTS v_inventory_minifigs_scores;
 DROP TABLE IF EXISTS tmp_act_minifig_score;
 
 -- Set root theme ids
-CREATE OR REPLACE VIEW v_root_theme AS
+DROP VIEW IF EXISTS v_root_theme;
+CREATE VIEW v_root_theme AS
 SELECT s.id, COALESCE(t3.id, t2.id, t1.id) AS root_theme_id
 FROM sets s
 LEFT JOIN themes t1 ON s.theme_id = t1.id
@@ -232,7 +235,8 @@ UPDATE sets SET root_theme_id = (
 DROP VIEW IF EXISTS v_root_theme;
 
 -- Update minifig properties
-CREATE OR REPLACE VIEW v_minifig_has_unique_part AS
+DROP VIEW IF EXISTS v_minifig_has_unique_part;
+CREATE VIEW v_minifig_has_unique_part AS
 SELECT m.id, MIN(pcf.total_amount) = 1 AS has_unique_part FROM minifigs m
 LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
 LEFT JOIN minifig_inventory_rel mir ON im.id = mir.inventory_minifig_id
@@ -241,7 +245,8 @@ LEFT JOIN (SELECT inventory_id, part_color_frequency_id, sum(quantity) AS quanti
 LEFT JOIN part_color_frequencies pcf ON ip.part_color_frequency_id = pcf.id
 GROUP BY m.id;
 
-CREATE OR REPLACE VIEW v_minifig_year_of_publication AS
+DROP VIEW IF EXISTS v_minifig_year_of_publication;
+CREATE VIEW v_minifig_year_of_publication AS
 SELECT m.id, MIN(s.year_of_publication) AS year_of_publication FROM minifigs m
 LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
 LEFT JOIN inventories i ON i.id = im.inventory_id and i.is_latest = TRUE
@@ -268,7 +273,8 @@ DROP TABLE IF EXISTS tmp_minifig_props;
 
 
 -- Create views for ui
-CREATE OR REPLACE VIEW v_inventory_parts AS
+DROP VIEW IF EXISTS v_inventory_parts;
+CREATE VIEW v_inventory_parts AS
 SELECT
 ip.id,
 ip.inventory_id,
@@ -288,7 +294,8 @@ LEFT JOIN parts p ON p.id = pcf.part_id
 LEFT JOIN colors c ON c.id = pcf.color_id
 LEFT JOIN (select DISTINCT part_color_frequency_id, first_value(element_id) OVER (PARTITION BY part_color_frequency_id ORDER BY id DESC) AS element_id from part_color_frequency_element_rel) e ON e.part_color_frequency_id = pcf.id;
 
-CREATE OR REPLACE VIEW v_sets AS 
+DROP VIEW IF EXISTS v_sets;
+CREATE VIEW v_sets AS 
 SELECT
 s.id,
 s.set_num,
@@ -306,7 +313,8 @@ LEFT JOIN scores sc ON sc.id = s.score_id
 LEFT JOIN themes rt ON rt.id = s.root_theme_id
 LEFT JOIN themes t ON t.id = s.theme_id;
 
-CREATE OR REPLACE VIEW v_scores AS
+DROP VIEW IF EXISTS v_scores;
+CREATE VIEW v_scores AS
 select * from (select sc.id, false as is_set, im.id as entity_id, sc.score, sc.calc_date, mf.fig_num as num, mf.name, mf.num_parts, mf.year_of_publication,
 case when sc.score < st.lower_quartil then 1
 when sc.score < st.median then 2
@@ -327,7 +335,8 @@ left join scores sc on sc.id = s.score_id
 left join statistics st on st.is_set = 't' and st.theme_id is null) as sc
 where sc.id is not null;
 
-CREATE OR REPLACE VIEW v_parts AS
+DROP VIEW IF EXISTS v_parts;
+CREATE VIEW v_parts AS
 select pcf.id, pcf.total_amount, c.name as color_name, c.rgb, c.is_trans, p.part_num, p.name as part_name, p.part_material,
 case when p.part_num like '%pr%' then true else false end as is_print,
 pc.name as category_name, pcfr.element_id, ep.price from part_color_frequencies pcf

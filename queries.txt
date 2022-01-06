@@ -292,6 +292,9 @@ select 'update sets set eol = ''' || eol || ''' where set_num = ''' || set_num |
 union all
 select 'update sets set retail_price = ' || retail_price || ' where set_num = ''' || set_num || ''';' as stmt from sets where retail_price is not null;
 
+select 'insert into element_prices (element_id, provider_id, price) select id, ''' || 1 || ''', ' || ep.price || ' from part_color_frequency_element_rel where element_id = ''' || pcfer.element_id || '''' from element_prices ep
+left join part_color_frequency_element_rel pcfer on pcfer.id = ep.element_id;
+
 create view v_sets as
 select s.*, sc.id as score_id from sets s
 left join inventories i on i.set_id = s.id and i.is_latest = 1

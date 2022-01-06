@@ -23,6 +23,8 @@ sudo docker-compose exec db psql -h localhost -p 5432 -U postgres -d brick_eval 
 
 Start REST-API flask application and make a request to create tables:
 ```
+sudo apt-get install libpq-dev
+pip install -r requirements.txt
 python api/app.py
 curl localhost:5000/api/sets
 ```

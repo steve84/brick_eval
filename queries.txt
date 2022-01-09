@@ -290,9 +290,9 @@ update sets set eol = '3' where set_num in ('10220-1','10252-1','10256-1','10260
 
 select 'update sets set eol = ''' || eol || ''' where set_num = ''' || set_num || ''';' as stmt from sets where eol <> '-1'
 union all
-select 'update sets set retail_price = ' || retail_price || ' where set_num = ''' || set_num || ''';' as stmt from sets where retail_price is not null;
-
-select 'insert into element_prices (element_id, provider_id, price) select id, ''' || 1 || ''', ' || ep.price || ' from part_color_frequency_element_rel where element_id = ''' || pcfer.element_id || '''' from element_prices ep
+select 'update sets set retail_price = ' || retail_price || ' where set_num = ''' || set_num || ''';' as stmt from sets where retail_price is not null
+union all
+select 'insert into element_prices (element_id, provider_id, price) select id, ''' || 1 || ''', ' || ep.price || ' from part_color_frequency_element_rel where element_id = ''' || pcfer.element_id || ''';' from element_prices ep
 left join part_color_frequency_element_rel pcfer on pcfer.id = ep.element_id;
 
 create view v_sets as

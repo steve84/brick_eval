@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Boolean,
     Float,
     Integer,
     Text,
@@ -21,6 +22,7 @@ class SetModel(db.Model):
     num_parts = Column(Integer, nullable=False)
     eol = Column(String(2), nullable=False, server_default='-1')
     retail_price = Column(Integer)
+    has_stickers = Column(Boolean, nullable=False, server_default='f')
     score_id = Column(Integer, db.ForeignKey('scores.id'))
     root_theme_id = Column(Integer, db.ForeignKey('themes.id'))
 
@@ -41,4 +43,5 @@ class VSetModel(db.Model):
     num_parts = Column(Integer, nullable=False)
     eol = Column(String(2))
     retail_price = Column(Integer)
+    has_stickers = Column(Boolean, nullable=False)
     score = Column(Float)

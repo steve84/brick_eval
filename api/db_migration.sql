@@ -234,6 +234,17 @@ UPDATE sets SET root_theme_id = (
 );
 DROP VIEW IF EXISTS v_root_theme;
 
+-- Determine if set has stickers
+UPDATE sets SET has_stickers = 't' WHERE id in (
+    select distinct s.id from sets s
+    left join inventories i on s.id = i.set_id
+    left join inventory_parts ip on i.id = ip.inventory_id
+    left join part_color_frequencies pcf on ip.part_color_frequency_id = pcf.id
+    left join parts p on pcf.part_id = p.id
+    left join part_categories pc on p.part_cat_id = pc.id
+    where pc.name = 'Stickers'
+);
+
 -- Update minifig properties
 DROP VIEW IF EXISTS v_minifig_has_unique_part;
 CREATE VIEW v_minifig_has_unique_part AS
@@ -304,6 +315,7 @@ s.year_of_publication,
 s.num_parts,
 s.eol,
 s.retail_price,
+s.has_stickers,
 sc.score,
 rt.name AS root_theme,
 t.name AS theme,

@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS tmp_part_freq;
 DROP TABLE IF EXISTS tmp_act_set_score;
 DROP TABLE IF EXISTS tmp_act_minifig_score;
 DROP TABLE IF EXISTS tmp_minifig_props;
+DROP TABLE IF EXISTS tmp_fig_similarities;
 --- Insert queries --
 
 -- Base tables
@@ -282,6 +283,123 @@ UPDATE minifigs SET (has_unique_part, year_of_publication) = (
 
 DROP TABLE IF EXISTS tmp_minifig_props;
 
+
+-- Insert minifig similarity data
+create view v_actual_minifig_inventories as
+select * from inventory_parts where inventory_id in (
+select distinct ifig.id from inventories iset
+left join inventory_minifigs im on im.inventory_id = iset.id
+left join minifig_inventory_rel mir on mir.inventory_minifig_id = im.id
+left join inventories ifig on ifig.id = mir.inventory_id
+where iset.set_id is not null and iset.is_latest = 't' and ifig.is_latest = 't')
+and is_spare = 'f';
+
+create view v_actual_minifig_scores as
+select ami.inventory_id, 1 / ((sum(pcf.total_amount) * 1.0) / sum(ami.quantity)) as score from v_actual_minifig_inventories ami
+left join part_color_frequencies pcf on pcf.id = ami.part_color_frequency_id
+group by ami.inventory_id;
+
+
+create view v_actual_minifig_similarities as
+select ami.id1, ami.id2, (ami.simi * 1.0 / mi1.num_parts) as pct from (
+select id1, id2, count(*) as simi from (
+select ami1.inventory_id as id1, ami2.inventory_id as id2 from v_actual_minifig_inventories ami1
+left join v_actual_minifig_inventories ami2 on ami1.part_color_frequency_id = ami2.part_color_frequency_id and ami1.inventory_id <> ami2.inventory_id
+where ami2.inventory_id is not null) ami
+group by id1, id2) ami
+left join (select inventory_id, max(inventory_minifig_id) as inventory_minifig_id from minifig_inventory_rel group by inventory_id) mir1 on mir1.inventory_id = ami.id1
+left join inventory_minifigs im1 on im1.id = mir1.inventory_minifig_id
+left join minifigs mi1 on mi1.id = im1.fig_id;
+
+create view v_actual_minifig_set_occurances as
+select subq.fig_id, count(subq.id) as amount from (select im.fig_id, i.id from (select * from inventories where is_latest = 't' and set_id is not null) i
+left join inventory_minifigs im on im.inventory_id = i.id
+where im.id is not null) as subq
+group by subq.fig_id;
+
+create view v_actual_minifig_set_stats as
+select im.fig_id, max(s.num_parts) as max_parts,  min(s.num_parts) as min_parts from inventory_minifigs im
+left join (select * from inventories where is_latest = 't' and set_id is not null) i on i.id = im.inventory_id
+left join sets s on s.id = i.set_id
+group by im.fig_id;
+
+CREATE TABLE tmp_fig_similarities (
+    id1 INTEGER NOT NULL,
+    id2 INTEGER NOT NULL,
+    pct NUMERIC NOT NULL
+);
+
+
+insert into tmp_fig_similarities
+select * from v_actual_minifig_similarities where pct >= 0.75;
+
+
+insert into minifig_similarities (
+inventory_minifig_id_1,
+inventory_minifig_id_2,
+set_occurance_minifig_1,
+set_occurance_minifig_2,
+max_set_parts_minifig_1,
+max_set_parts_minifig_2,
+min_set_parts_minifig_1,
+min_set_parts_minifig_2,
+score_minifig_1,
+score_minifig_2,
+num_parts_minifig_1,
+num_parts_minifig_2,
+theme_minifig_1,
+theme_minifig_2,
+name_minifig_1,
+name_minifig_2,
+num_minifig_1,
+num_minifig_2,
+similarity)
+select 
+mir1.inventory_minifig_id,
+mir2.inventory_minifig_id,
+amso1.amount,
+amso2.amount,
+mss1.max_parts,
+mss2.max_parts,
+mss1.min_parts,
+mss2.min_parts,
+ams1.score,
+ams2.score,
+m1.num_parts,
+m2.num_parts,
+t1.name,
+t2.name,
+m1.name,
+m2.name,
+m1.fig_num,
+m2.fig_num,
+ams.pct
+from tmp_fig_similarities ams
+left join (select inventory_id, max(inventory_minifig_id) as inventory_minifig_id from minifig_inventory_rel group by inventory_id) mir1 on mir1.inventory_id = ams.id1
+left join (select inventory_id, max(inventory_minifig_id) as inventory_minifig_id from minifig_inventory_rel group by inventory_id) mir2 on mir2.inventory_id = ams.id2
+left join inventory_minifigs im1 on im1.id = mir1.inventory_minifig_id
+left join inventory_minifigs im2 on im2.id = mir2.inventory_minifig_id
+left join inventories i1 on im1.inventory_id = i1.id
+left join inventories i2 on im2.inventory_id = i2.id
+left join sets s1 on i1.set_id = s1.id
+left join sets s2 on i2.set_id = s2.id
+left join themes t1 on s1.root_theme_id = t1.id
+left join themes t2 on s2.root_theme_id = t2.id
+left join v_actual_minifig_scores ams1 on ams1.inventory_id = ams.id1
+left join v_actual_minifig_scores ams2 on ams2.inventory_id = ams.id2
+left join minifigs m1 on m1.id = im1.fig_id
+left join minifigs m2 on m2.id = im2.fig_id
+left join v_actual_minifig_set_occurances amso1 on amso1.fig_id = m1.id
+left join v_actual_minifig_set_occurances amso2 on amso2.fig_id = m2.id
+left join v_actual_minifig_set_stats mss1 on mss1.fig_id = im1.fig_id
+left join v_actual_minifig_set_stats mss2 on mss2.fig_id = im2.fig_id;
+
+DROP TABLE tmp_fig_similarities;
+DROP VIEW v_actual_minifig_set_occurances;
+DROP VIEW v_actual_minifig_similarities;
+DROP VIEW v_actual_minifig_scores;
+DROP VIEW v_actual_minifig_inventories;
+DROP VIEW v_actual_minifig_set_stats;
 
 -- Create views for ui
 DROP VIEW IF EXISTS v_inventory_parts;

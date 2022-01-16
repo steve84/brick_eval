@@ -43,7 +43,7 @@ SELECT element_id, provider_id, price FROM element_prices;
 TRUNCATE
 colors, minifigs, part_categories, themes, sets, parts, part_color_frequency_element_rel, part_color_frequencies,
 inventories, part_relationships, inventory_minifigs, inventory_sets, inventory_parts,
-minifig_inventory_rel, set_inventory_rel, scores, element_prices, statistics CASCADE;
+minifig_inventory_rel, set_inventory_rel, scores, element_prices, statistics, minifig_similarities CASCADE;
 
 -- Drop tables
 
@@ -65,3 +65,4 @@ DROP TABLE IF EXISTS sets CASCADE;
 DROP TABLE IF EXISTS statistics CASCADE;
 DROP TABLE IF EXISTS themes CASCADE;
 DROP TABLE IF EXISTS element_prices CASCADE;
+DROP TABLE IF EXISTS minifig_similarities CASCADE;

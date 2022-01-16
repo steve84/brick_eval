@@ -23,7 +23,7 @@ from models.part import (
     PartRelationshipModel,
     VPartModel
 )
-from models.score import ScoreModel, VScoreModel
+from models.score import ScoreModel, VScoreModel, MinifigSimilarityModel
 from models.statistic import StatisticModel
 from models.theme import ThemeModel
 
@@ -49,7 +49,8 @@ CREATE_TABLES = [
     ScoreModel.__table__,
     StatisticModel.__table__,
     ThemeModel.__table__,
-    ElementPriceModel.__table__
+    ElementPriceModel.__table__,
+    MinifigSimilarityModel.__table__
 ]
 
 @app.before_first_request
@@ -72,6 +73,7 @@ if __name__ == '__main__':
     manager.create_api(PartColorFrequencyModel, methods=['GET'])
     manager.create_api(ScoreModel, methods=['GET'])
     manager.create_api(VScoreModel, methods=['GET'])
+    manager.create_api(MinifigSimilarityModel, methods=['GET'])
     manager.create_api(SetModel, methods=['GET'])
     manager.create_api(VSetModel, methods=['GET'])
     manager.create_api(StatisticModel, methods=['GET'])

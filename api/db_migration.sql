@@ -75,16 +75,16 @@ LEFT JOIN inventories_tmp i ON s.set_num = i.set_num;
 DROP VIEW IF EXISTS v_latest_inventory;
 CREATE VIEW v_latest_inventory as
 SELECT i.id FROM (SELECT * FROM inventories WHERE set_id IS NOT NULL) i
-LEFT JOIN (SELECT set_id, max(version) AS max_version FROM inventories GROUP BY set_id) AS max_i ON i.set_id = max_i.set_id AND i.version = max_i.max_version
-WHERE max_i.set_id IS NOT NULL
+JOIN (SELECT set_id, max(version) AS max_version FROM inventories GROUP BY set_id) AS max_i
+ON i.set_id = max_i.set_id AND i.version = max_i.max_version
 UNION ALL
-SELECT mir.inventory_id FROM minifig_inventory_rel mir
-LEFT JOIN inventories i ON i.id = mir.inventory_id
-LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
-LEFT JOIN (SELECT im.fig_id, max(i.version) AS max_version FROM minifig_inventory_rel mir
-LEFT JOIN inventories i ON i.id = mir.inventory_id
-LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
-GROUP BY im.fig_id) AS im_max ON im_max.fig_id = im.fig_id AND im_max.max_version = i.version;
+SELECT DISTINCT ifig.id FROM inventory_minifigs im
+JOIN minifig_inventory_rel mir ON mir.inventory_minifig_id = im.id
+JOIN inventories ifig ON ifig.id = mir.inventory_id
+JOIN (SELECT im.fig_id, max(ifig.version) as max_version FROM inventory_minifigs im
+JOIN minifig_inventory_rel mir ON mir.inventory_minifig_id = im.id
+JOIN inventories ifig ON ifig.id = mir.inventory_id
+GROUP BY im.fig_id) im_max ON im_max.max_version = ifig.version AND im_max.fig_id = im.fig_id;
 
 UPDATE inventories SET is_latest = TRUE WHERE inventories.id IN (SELECT id FROM v_latest_inventory);
 UPDATE inventories SET is_latest = FALSE WHERE inventories.id NOT IN (SELECT id FROM v_latest_inventory);
@@ -99,10 +99,11 @@ FROM (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id IS NOT NULL) i
 LEFT JOIN inventory_parts ip ON i.id = ip.inventory_id
 GROUP BY ip.part_color_frequency_id
 UNION ALL
-SELECT ip.part_color_frequency_id, sum(ip.quantity * im.quantity) AS quantity FROM minifig_inventory_rel mir
-LEFT JOIN (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id is NULL) i ON i.id = mir.inventory_id
-LEFT JOIN inventory_minifigs im ON im.id = mir.inventory_minifig_id
-LEFT JOIN inventory_parts ip ON i.id = ip.inventory_id
+SELECT ip.part_color_frequency_id, sum(ip.quantity * im.quantity) AS quantity FROM (SELECT * FROM inventories WHERE is_latest = TRUE AND set_id IS NOT NULL) i
+JOIN inventory_minifigs im ON im.inventory_id = i.id
+JOIN minifig_inventory_rel mir ON mir.inventory_minifig_id = im.id
+JOIN inventories iset ON iset.id = mir.inventory_id
+JOIN inventory_parts ip ON iset.id = ip.inventory_id
 GROUP BY ip.part_color_frequency_id) AS subq
 GROUP BY subq.part_color_frequency_id;
 
@@ -163,6 +164,32 @@ SELECT pcfer.id, tep.provider_id, tep.price FROM tmp_element_prices tep
 LEFT JOIN part_color_frequency_element_rel pcfer on pcfer.element_id = tep.element_id
 WHERE pcfer.id IS NOT NULL;
 
+
+-- Calculate scores
+insert into scores (inventory_id, score, calc_date)
+select id, score, current_date from (
+select id, sum((quantity * 1.0 / num_parts) * ((1 - ((total_amount - quantity) / (max_amount * 1.0)))) ^ 100) as score from (
+select i.id, ip.quantity, minv.num_parts, mp.max_amount, pcf.total_amount from inventories i,
+inventory_parts ip,
+part_color_frequencies pcf,
+(select inventory_id, sum(quantity) as num_parts from inventory_parts group by inventory_id) minv,
+(select max(total_amount) as max_amount from part_color_frequencies) mp
+where ip.inventory_id = i.id and pcf.id = ip.part_color_frequency_id and i.is_latest = 't' and i.set_id is not null and minv.inventory_id = i.id) subq
+group by id) as subq;
+
+insert into scores (inventory_id, score, calc_date)
+select id, score, current_date from (
+select id, sum((quantity * 1.0 / num_parts) * ((1 - ((total_amount - quantity) / (max_amount * 1.0)))) ^ 100) as score from (
+select i.id, ip.quantity, m.num_parts, mp.max_amount, pcf.total_amount from inventory_minifigs im,
+(select inventory_id, max(inventory_minifig_id) as inventory_minifig_id from minifig_inventory_rel group by inventory_id) mir,
+inventories i,
+inventory_parts ip,
+part_color_frequencies pcf,
+minifigs m,
+(select max(total_amount) as max_amount from part_color_frequencies) mp
+where mir.inventory_minifig_id = im.id and i.id = mir.inventory_id and ip.inventory_id = i.id and pcf.id = ip.part_color_frequency_id and i.is_latest = 't' and ip.is_spare = 'f' and im.fig_id = m.id) subq
+group by id) as subq;
+
 -- Set score ids
 CREATE TABLE tmp_act_set_score (
 	set_id INTEGER NOT NULL,
@@ -220,6 +247,60 @@ UPDATE inventory_minifigs SET score_id = (
 );
 DROP VIEW IF EXISTS v_inventory_minifigs_scores;
 DROP TABLE IF EXISTS tmp_act_minifig_score;
+
+-- Insert statistics
+INSERT INTO statistics (is_set, theme_id, property_name, count, mean, std, min_value, lower_quartil, median, upper_quartil, max_value, calc_date)
+(SELECT
+TRUE,
+t.id,
+'score',
+COUNT(score),
+AVG(score),
+COALESCE(stddev(score), -1),
+MIN(score),
+PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY score),
+PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score),
+PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY score),
+MAX(score),
+CURRENT_DATE
+FROM scores sc,
+inventories i, themes t, sets s
+WHERE s.score_id = sc.id AND i.id = sc.inventory_id AND t.id = s.root_theme_id
+GROUP BY t.id)
+UNION ALL
+(SELECT
+TRUE,
+NULL,
+'score',
+COUNT(score),
+AVG(score),
+COALESCE(stddev(score), -1),
+MIN(score),
+PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY score),
+PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score),
+PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY score),
+MAX(score),
+CURRENT_DATE
+FROM scores sc,
+SETS s
+WHERE s.score_id = sc.id)
+UNION ALL
+(SELECT
+FALSE,
+NULL,
+'score',
+COUNT(score),
+AVG(score),
+COALESCE(stddev(score), -1),
+MIN(score),
+PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY score),
+PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score),
+PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY score),
+MAX(score),
+CURRENT_DATE
+FROM scores sc,
+inventory_minifigs im
+WHERE im.score_id = sc.id);
 
 -- Set root theme ids
 DROP VIEW IF EXISTS v_root_theme;
@@ -294,10 +375,12 @@ left join inventories ifig on ifig.id = mir.inventory_id
 where iset.set_id is not null and iset.is_latest = 't' and ifig.is_latest = 't')
 and is_spare = 'f';
 
-create view v_actual_minifig_scores as
-select ami.inventory_id, 1 / ((sum(pcf.total_amount) * 1.0) / sum(ami.quantity)) as score from v_actual_minifig_inventories ami
-left join part_color_frequencies pcf on pcf.id = ami.part_color_frequency_id
-group by ami.inventory_id;
+CREATE VIEW v_latest_score AS
+SELECT * FROM scores WHERE id IN (
+    SELECT DISTINCT
+    first_value(id) OVER (PARTITION BY inventory_id ORDER BY calc_date DESC)
+    FROM scores
+);
 
 
 create view v_actual_minifig_similarities as
@@ -333,7 +416,7 @@ CREATE TABLE tmp_fig_similarities (
 insert into tmp_fig_similarities
 select * from v_actual_minifig_similarities where pct >= 0.75;
 
-
+TRUNCATE minifig_similarities;
 insert into minifig_similarities (
 inventory_minifig_id_1,
 inventory_minifig_id_2,
@@ -363,8 +446,8 @@ mss1.max_parts,
 mss2.max_parts,
 mss1.min_parts,
 mss2.min_parts,
-ams1.score,
-ams2.score,
+ls1.score,
+ls2.score,
 m1.num_parts,
 m2.num_parts,
 t1.name,
@@ -385,8 +468,8 @@ left join sets s1 on i1.set_id = s1.id
 left join sets s2 on i2.set_id = s2.id
 left join themes t1 on s1.root_theme_id = t1.id
 left join themes t2 on s2.root_theme_id = t2.id
-left join v_actual_minifig_scores ams1 on ams1.inventory_id = ams.id1
-left join v_actual_minifig_scores ams2 on ams2.inventory_id = ams.id2
+left join v_latest_score ls1 on ls1.inventory_id = ams.id1
+left join v_latest_score ls2 on ls2.inventory_id = ams.id2
 left join minifigs m1 on m1.id = im1.fig_id
 left join minifigs m2 on m2.id = im2.fig_id
 left join v_actual_minifig_set_occurances amso1 on amso1.fig_id = m1.id
@@ -397,7 +480,7 @@ left join v_actual_minifig_set_stats mss2 on mss2.fig_id = im2.fig_id;
 DROP TABLE tmp_fig_similarities;
 DROP VIEW v_actual_minifig_set_occurances;
 DROP VIEW v_actual_minifig_similarities;
-DROP VIEW v_actual_minifig_scores;
+DROP VIEW v_latest_score;
 DROP VIEW v_actual_minifig_inventories;
 DROP VIEW v_actual_minifig_set_stats;
 

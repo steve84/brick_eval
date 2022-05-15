@@ -12,8 +12,10 @@ Copy sql files to docker:
 ```
 sudo docker-compose exec db rm -rf /var/lib/postgresql/data/db_cleanup.sql
 sudo docker-compose exec db rm -rf /var/lib/postgresql/data/db_migration.sql
+sudo docker-compose exec db rm -rf /var/lib/postgresql/data/db_external_data.sql
 sudo docker cp api/db_cleanup.sql brickeval_db_1:/var/lib/postgresql/data
 sudo docker cp api/db_migration.sql brickeval_db_1:/var/lib/postgresql/data
+sudo docker cp api/db_external_data.sql brickeval_db_1:/var/lib/postgresql/data
 ```
 
 Remove old tables and store some values:
@@ -26,7 +28,7 @@ Start REST-API flask application and make a request to create tables:
 sudo apt-get install libpq-dev
 pip install -r requirements.txt
 python api/app.py
-curl localhost:5000/api/sets
+curl -H "Accept: application/vnd.api+json" localhost:5000/api/sets
 ```
 
 Setup database:

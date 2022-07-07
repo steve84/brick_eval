@@ -436,6 +436,10 @@ name_minifig_1,
 name_minifig_2,
 num_minifig_1,
 num_minifig_2,
+rebrickable_id_minifig_1,
+rebrickable_id_minifig_2,
+year_of_publication_minifig_1,
+year_of_publication_minifig_2,
 similarity)
 select 
 mir1.inventory_minifig_id,
@@ -456,6 +460,10 @@ m1.name,
 m2.name,
 m1.fig_num,
 m2.fig_num,
+m1.rebrickable_id,
+m2.rebrickable_id,
+m1.year_of_publication,
+m2.year_of_publication,
 ams.pct
 from tmp_fig_similarities ams
 left join (select inventory_id, max(inventory_minifig_id) as inventory_minifig_id from minifig_inventory_rel group by inventory_id) mir1 on mir1.inventory_id = ams.id1

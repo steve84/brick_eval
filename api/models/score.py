@@ -56,6 +56,10 @@ class MinifigSimilarityModel(db.Model):
     name_minifig_2 = Column(Text, nullable=False)
     num_minifig_1 = Column(Text, nullable=False)
     num_minifig_2 = Column(Text, nullable=False)
+    rebrickable_id_minifig_1 = Column(Integer)
+    rebrickable_id_minifig_2 = Column(Integer)
+    year_of_publication_minifig_1 = Column(Integer, nullable=False)
+    year_of_publication_minifig_2 = Column(Integer, nullable=False)
     similarity = Column(Float, nullable=False)
 
 

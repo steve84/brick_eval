@@ -8,14 +8,16 @@ Execute create_tmp_tables.py to create temporary tables:
 python create_tmp_tables.py
 ```
 
+Get rebrickable ids of minifigs:
+
+```
+python api/scripts/generate_sql_rebrickable_minifig.py
+```
+
 Copy sql files to docker:
 ```
-sudo docker-compose exec db rm -rf /var/lib/postgresql/data/db_cleanup.sql
-sudo docker-compose exec db rm -rf /var/lib/postgresql/data/db_migration.sql
-sudo docker-compose exec db rm -rf /var/lib/postgresql/data/db_external_data.sql
-sudo docker cp api/db_cleanup.sql brickeval_db_1:/var/lib/postgresql/data
-sudo docker cp api/db_migration.sql brickeval_db_1:/var/lib/postgresql/data
-sudo docker cp api/db_external_data.sql brickeval_db_1:/var/lib/postgresql/data
+sudo docker-compose exec db rm -rf /var/lib/postgresql/data/{db_cleanup,db_migration,db_external_data,rebrickable_minifigs}.sql
+sudo docker cp api/db_cleanup.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_migration.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_external_data.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/rebrickable_minifigs.sql brickeval_db_1:/var/lib/postgresql/data
 ```
 
 Remove old tables and store some values:

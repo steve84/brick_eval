@@ -4,12 +4,15 @@ import requests
 import sys
 import time
 
+from datetime import datetime, timedelta
+from sqlalchemy import func
+
 
 sys.path.insert(0, '../')
 from db import db  # nopep8
 from app import app  # nopep8
 
-from models.set import SetModel  # nopep8
+from models.set import SetModel, SetPriceModel  # nopep8
 
 parser = argparse.ArgumentParser(
     description='Get prices and eol state of sets.'
@@ -20,6 +23,8 @@ parser.add_argument('--themes', dest='themes', type=str,
                     help='comma separated theme ids of the sets')
 parser.add_argument('--eol', dest='eol', type=str,
                     default='-1', help='comma separated eol states')
+parser.add_argument('--max_days_since', dest='max_days_since', type=int,
+                    default='180', help='max days since last price/eol state update')
 parser.add_argument('--max_items', dest='max_items', type=int, default=10,
                     help='max sets to process')
 
@@ -30,10 +35,12 @@ years = None if parser.parse_args(
 eol = None if parser.parse_args(
 ).eol is None else parser.parse_args().eol.split(',')
 max_items = parser.parse_args().max_items
+max_days_since = parser.parse_args().max_days_since
 
 headers = {
     'x-locale': 'de-CH',
     'content-type': 'application/json',
+    'origin': 'https://www.lego.com',
     'user-agent': ('Mozilla/5.0 (Windows NT 6.3; Win64; x64) '
                    'AppleWebKit/537.36 (KHTML, like Gecko) '
                    'Chrome/81.0.4044.122 Safari/537.36')
@@ -79,6 +86,9 @@ def getPrice(data):
 
 s = requests.Session()
 
+
+price_query = db.session.query(SetPriceModel.set_id, SetPriceModel.check_date, func.rank().over(partition_by=SetPriceModel.set_id, order_by=SetPriceModel.check_date.desc()).label('rnk')).subquery()
+
 add_filters = tuple()
 if years is not None:
     add_filters += (SetModel.year_of_publication.in_(
@@ -88,11 +98,19 @@ if themes_id is not None:
         [t for t in map(lambda x: int(x), themes_id)]),)
 if eol is not None:
     add_filters += (SetModel.eol.in_([e for e in map(lambda x: str(x), eol)]),)
+else:
+    add_filters += (SetModel.eol != 0,)
+
+
+existing_prices = list()
+if max_days_since is not None:
+    price_query = db.session.query(price_query).filter(price_query.c.rnk == 1 and SetPriceModel.check_date > (datetime.now().date() - timedelta(days=max_days_since)))
+    existing_prices = [x for x in map(lambda x: x.set_id, price_query.all())]
 
 
 db.init_app(app)
 with app.app_context():
-    sets = db.session.query(SetModel).filter(*add_filters).all()
+    sets = db.session.query(SetModel).filter(*add_filters).filter(SetModel.id.notin_(existing_prices)).limit(max_items).all()
 
     i = 0
     for setrow in sets:
@@ -115,6 +133,11 @@ with app.app_context():
                             set_data['productCode'] == setnr):
                         price = getPrice(set_data)
                         print('%s: %d' % (setrow.set_num, price))
+                        db.session.add(SetPriceModel(
+                            set_id=setrow.id,
+                            retail_price=price,
+                            check_date=datetime.now().date()
+                        ))
                         setrow.retail_price = int(price)
                         if str(setrow.eol) not in ['2', '3']:
                             setrow.eol = '1'

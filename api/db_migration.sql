@@ -136,7 +136,7 @@ DROP VIEW IF EXISTS v_latest_inventory;
 -- Update generated data --
 UPDATE sets
 SET
-      (eol, retail_price) = (SELECT tmp_sets_info.eol, tmp_sets_info.retail_price
+      eol = (SELECT tmp_sets_info.eol
                             FROM tmp_sets_info
                             WHERE tmp_sets_info.set_num = sets.set_num)
 WHERE
@@ -163,6 +163,11 @@ INSERT INTO element_prices (element_id, provider_id, price)
 SELECT pcfer.id, tep.provider_id, tep.price FROM tmp_element_prices tep
 LEFT JOIN part_color_frequency_element_rel pcfer on pcfer.element_id = tep.element_id
 WHERE pcfer.id IS NOT NULL;
+
+INSERT INTO set_prices (set_id, check_date, retail_price)
+SELECT s.id, tsp.check_date, tsp.retail_price FROM tmp_set_prices tsp
+LEFT JOIN sets s on s.set_num = tsp.set_num
+WHERE s.id IS NOT NULL;
 
 
 -- Calculate scores
@@ -523,7 +528,7 @@ s.name,
 s.year_of_publication,
 s.num_parts,
 s.eol,
-s.retail_price,
+sp.retail_price,
 s.has_stickers,
 sc.score,
 rt.name AS root_theme,
@@ -531,6 +536,7 @@ t.name AS theme,
 t.id AS theme_id
 FROM sets s
 LEFT JOIN scores sc ON sc.id = s.score_id
+LEFT JOIN (select set_id, retail_price, check_date, rank() OVER (PARTITION BY set_id ORDER BY check_date DESC) AS rnk FROM set_prices) sp ON sp.set_id = s.id AND sp.rnk = 1
 LEFT JOIN themes rt ON rt.id = s.root_theme_id
 LEFT JOIN themes t ON t.id = s.theme_id;
 
@@ -585,3 +591,4 @@ DROP TABLE IF EXISTS themes_tmp;
 DROP TABLE IF EXISTS tmp_sets_info;
 DROP TABLE IF EXISTS tmp_scores;
 DROP TABLE IF EXISTS tmp_element_prices;
+DROP TABLE IF EXISTS tmp_set_prices;

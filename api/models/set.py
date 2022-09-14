@@ -1,6 +1,7 @@
 from sqlalchemy import (
     Column,
     Boolean,
+    Date,
     Float,
     Integer,
     Text,
@@ -21,7 +22,6 @@ class SetModel(db.Model):
     theme_id = Column(Integer, db.ForeignKey('themes.id'), nullable=False)
     num_parts = Column(Integer, nullable=False)
     eol = Column(String(2), nullable=False, server_default='-1')
-    retail_price = Column(Integer)
     has_stickers = Column(Boolean, nullable=False, server_default='f')
     score_id = Column(Integer, db.ForeignKey('scores.id'))
     root_theme_id = Column(Integer, db.ForeignKey('themes.id'))
@@ -29,6 +29,22 @@ class SetModel(db.Model):
     theme = db.relationship('ThemeModel', foreign_keys=[theme_id])
     root_theme = db.relationship('ThemeModel', foreign_keys=[root_theme_id])
     score = db.relationship('ScoreModel')
+    prices = db.relationship('SetPriceModel')
+
+
+
+class SetPriceModel(db.Model):
+    __tablename__ = 'set_prices'
+    __table_args__ = (
+        db.Index('set_price_index', 'set_id',
+                 'check_date', unique=True),
+    )
+
+    id = Column(Integer, primary_key=True)
+    retail_price = Column(Integer, nullable=False)
+    check_date = Column(Date, nullable=False)
+    set_id = Column(Integer, db.ForeignKey('sets.id'))
+
 
 class VSetModel(db.Model):
     __tablename__ = 'v_sets'

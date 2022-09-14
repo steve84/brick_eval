@@ -340,7 +340,7 @@ update sets set eol = '3' where set_num in ('10220-1','10252-1','10256-1','10260
 
 (select 'update sets set eol = ''' || eol || ''' where set_num = ''' || set_num || ''';' as stmt from sets where eol <> '-1' order by set_num)
 union all
-(select 'update sets set retail_price = ' || retail_price || ' where set_num = ''' || set_num || ''';' as stmt from sets where retail_price is not null order by set_num)
+(select 'insert into set_prices (set_id, retail_price, check_date) select id, ' || sp.retail_price || ', to_date(''' || sp.check_date || ''', ''YYYY-MM-DD'') from sets where set_num = ''' || s.set_num || ''';' as stmt from set_prices sp left join sets s on s.id = sp.set_id order by s.set_num, sp.check_date desc)
 union all
 (select 'insert into element_prices (element_id, provider_id, price) select id, ''' || 1 || ''', ' || ep.price || ' from part_color_frequency_element_rel where element_id = ''' || pcfer.element_id || ''';' from element_prices ep
 left join part_color_frequency_element_rel pcfer on pcfer.id = ep.element_id

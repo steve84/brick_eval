@@ -3,7 +3,7 @@ from flask_restless import APIManager
 
 from db import app, db
 
-from models.set import SetModel, VSetModel
+from models.set import SetModel, SetPriceModel, VSetModel
 from models.color import ColorModel
 from models.element import ElementPriceModel, PartColorFrequencyElementRelation
 from models.inventory import (
@@ -33,6 +33,7 @@ from resources.theme import theme_bp
 # Do only create real tables (not views)
 CREATE_TABLES = [
     SetModel.__table__,
+    SetPriceModel.__table__,
     ColorModel.__table__,
     PartCategoryModel.__table__,
     PartColorFrequencyElementRelation.__table__,
@@ -75,6 +76,7 @@ if __name__ == '__main__':
     manager.create_api(VScoreModel, methods=['GET'])
     manager.create_api(MinifigSimilarityModel, methods=['GET'])
     manager.create_api(SetModel, methods=['GET'])
+    manager.create_api(SetPriceModel, methods=['GET'])
     manager.create_api(VSetModel, methods=['GET'])
     manager.create_api(StatisticModel, methods=['GET'])
     manager.create_api(ThemeModel, methods=['GET'])

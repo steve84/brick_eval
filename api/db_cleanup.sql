@@ -5,8 +5,7 @@ DROP TABLE IF EXISTS tmp_element_prices;
 -- Create tmp tables to store generated data --
 CREATE TABLE tmp_sets_info (
 	set_num TEXT NOT NULL UNIQUE,
-	eol VARCHAR(2) DEFAULT -1,
-	retail_price INTEGER
+	eol VARCHAR(2) DEFAULT -1
 );
 
 CREATE TABLE tmp_scores (
@@ -22,10 +21,16 @@ CREATE TABLE tmp_element_prices (
 	price INTEGER NOT NULL
 );
 
+CREATE TABLE tmp_set_prices (
+	set_num TEXT NOT NULL,
+	check_date DATE NOT NULL,
+	retail_price INTEGER NOT NULL
+);
+
 
 -- Insert generated data into tmp tables
 INSERT INTO tmp_sets_info
-SELECT set_num, eol, retail_price FROM sets WHERE retail_price IS NOT NULL OR eol <> '-1';
+SELECT set_num, eol FROM sets WHERE eol <> '-1';
 
 INSERT INTO tmp_scores
 SELECT DISTINCT s.set_num, m.fig_num, sc.score, sc.calc_date FROM scores sc
@@ -37,6 +42,10 @@ LEFT JOIN minifigs m ON im.fig_id = m.id;
 
 INSERT INTO tmp_element_prices
 SELECT element_id, provider_id, price FROM element_prices;
+
+INSERT INTO tmp_set_prices
+SELECT s.set_num, sp.check_date, sp.retail_price FROM set_prices sp
+LEFT JOIN sets s ON sp.set_id = s.id;
 
 
 -- Delete queries --
@@ -60,6 +69,7 @@ DROP TABLE IF EXISTS part_color_frequencies CASCADE;
 DROP TABLE IF EXISTS part_relationships CASCADE;
 DROP TABLE IF EXISTS parts CASCADE;
 DROP TABLE IF EXISTS scores CASCADE;
+DROP TABLE IF EXISTS set_prices CASCADE;
 DROP TABLE IF EXISTS set_inventory_rel CASCADE;
 DROP TABLE IF EXISTS sets CASCADE;
 DROP TABLE IF EXISTS statistics CASCADE;

@@ -3,6 +3,11 @@ DROP TABLE IF EXISTS tmp_act_set_score;
 DROP TABLE IF EXISTS tmp_act_minifig_score;
 DROP TABLE IF EXISTS tmp_minifig_props;
 DROP TABLE IF EXISTS tmp_fig_similarities;
+
+-- Remove set/minifig inventories without reference in inventories table
+delete from inventory_sets_tmp where inventory_id not in (select id from inventories_tmp);
+delete from inventory_minifigs_tmp where inventory_id not in (select id from inventories_tmp);
+
 --- Insert queries --
 
 -- Base tables
@@ -59,6 +64,9 @@ LEFT JOIN parts p ON t.part_num = p.part_num
 LEFT JOIN colors c ON t.color_id = c.id
 LEFT JOIN part_color_frequencies pcf ON p.id = pcf.part_id AND c.id = pcf.color_id
 WHERE pcf.id IS NOT NULL;
+
+-- Update rebrickable ids
+\ir rebrickable_minifigs.sql
 
 -- Generated FROM base tables
 INSERT INTO minifig_inventory_rel (inventory_id, inventory_minifig_id, quantity)

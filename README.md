@@ -20,7 +20,7 @@ sudo docker-compose exec db rm -rf /var/lib/postgresql/data/{db_cleanup,db_migra
 sudo docker cp api/db_cleanup.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_migration.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_external_data.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/rebrickable_minifigs.sql brickeval_db_1:/var/lib/postgresql/data
 ```
 
-Remove old tables and store some values:
+Remove old tables and store some values (Not neccessary if you started with an empty database) 
 ```
 sudo docker-compose exec db psql -h localhost -p 5432 -U postgres -d brick_eval -f /var/lib/postgresql/data/db_cleanup.sql --set ON_ERROR_STOP=on
 ```

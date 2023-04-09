@@ -62,8 +62,9 @@ for gz_file in gz_files:
 
     # fix problem in themes data
     if table_name == 'themes':
+        df['parent_id'] = df['parent_id'].astype('object')
         df['parent_id'] = df['parent_id'].where(
-            pd.notnull(df['parent_id']),
+            pd.notna,
             None)
 
     table_name += '_tmp'

@@ -63,7 +63,6 @@ headers = dict()
 headers['x-api-key'] = 'saVSCq0hpuxYV48mrXMGfdKnMY1oUs3s'
 
 
-db.init_app(app)
 with app.app_context():
     element_prices = db.session.query(ElementPriceModel.element_id)
 

@@ -86,30 +86,29 @@ def getPrice(data):
 
 s = requests.Session()
 
-
-price_query = db.session.query(SetPriceModel.set_id, SetPriceModel.check_date, func.rank().over(partition_by=SetPriceModel.set_id, order_by=SetPriceModel.check_date.desc()).label('rnk')).subquery()
-
-add_filters = tuple()
-if years is not None:
-    add_filters += (SetModel.year_of_publication.in_(
-        [y for y in map(lambda x: int(x), years)]),)
-if themes_id is not None:
-    add_filters += (SetModel.theme_id.in_(
-        [t for t in map(lambda x: int(x), themes_id)]),)
-if eol is not None:
-    add_filters += (SetModel.eol.in_([e for e in map(lambda x: str(x), eol)]),)
-else:
-    add_filters += (SetModel.eol != 0,)
-
-
-existing_prices = list()
-if max_days_since is not None:
-    price_query = db.session.query(price_query).filter(price_query.c.rnk == 1 and SetPriceModel.check_date > (datetime.now().date() - timedelta(days=max_days_since)))
-    existing_prices = [x for x in map(lambda x: x.set_id, price_query.all())]
-
-
-db.init_app(app)
 with app.app_context():
+
+    price_query = db.session.query(SetPriceModel.set_id, SetPriceModel.check_date, func.rank().over(partition_by=SetPriceModel.set_id, order_by=SetPriceModel.check_date.desc()).label('rnk')).subquery()
+
+    add_filters = tuple()
+    if years is not None:
+        add_filters += (SetModel.year_of_publication.in_(
+            [y for y in map(lambda x: int(x), years)]),)
+    if themes_id is not None:
+        add_filters += (SetModel.theme_id.in_(
+            [t for t in map(lambda x: int(x), themes_id)]),)
+    if eol is not None:
+        add_filters += (SetModel.eol.in_([e for e in map(lambda x: str(x), eol)]),)
+    else:
+        add_filters += (SetModel.eol != 0,)
+
+
+    existing_prices = list()
+    if max_days_since is not None:
+        price_query = db.session.query(price_query).filter(price_query.c.rnk == 1 and SetPriceModel.check_date > (datetime.now().date() - timedelta(days=max_days_since)))
+        existing_prices = [x for x in map(lambda x: x.set_id, price_query.all())]
+
+
     sets = db.session.query(SetModel).filter(*add_filters).filter(SetModel.id.notin_(existing_prices)).limit(max_items).all()
 
     i = 0

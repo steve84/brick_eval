@@ -5,7 +5,9 @@ DROP TABLE IF EXISTS tmp_element_prices;
 -- Create tmp tables to store generated data --
 CREATE TABLE tmp_sets_info (
 	set_num TEXT NOT NULL UNIQUE,
-	eol VARCHAR(2) DEFAULT -1
+	eol VARCHAR(2) DEFAULT -1,
+	name_de TEXT,
+	lego_slug TEXT
 );
 
 CREATE TABLE tmp_scores (
@@ -30,7 +32,7 @@ CREATE TABLE tmp_set_prices (
 
 -- Insert generated data into tmp tables
 INSERT INTO tmp_sets_info
-SELECT set_num, eol FROM sets WHERE eol <> '-1';
+SELECT set_num, eol, name_de, lego_slug FROM sets WHERE eol <> '-1' or name_de is not null or lego_slug is not null;
 
 INSERT INTO tmp_scores
 SELECT DISTINCT s.set_num, m.fig_num, sc.score, sc.calc_date FROM scores sc

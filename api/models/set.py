@@ -18,6 +18,7 @@ class SetModel(db.Model):
     id = Column(Integer, primary_key=True)
     set_num = Column(Text, nullable=False, unique=True)
     name = Column(Text, nullable=False)
+    name_de = Column(Text)
     year_of_publication = Column(Integer, nullable=False)
     theme_id = Column(Integer, db.ForeignKey('themes.id'), nullable=False)
     num_parts = Column(Integer, nullable=False)
@@ -25,6 +26,8 @@ class SetModel(db.Model):
     has_stickers = Column(Boolean, nullable=False, server_default='f')
     score_id = Column(Integer, db.ForeignKey('scores.id'))
     root_theme_id = Column(Integer, db.ForeignKey('themes.id'))
+    rebrickable_id = Column(Integer)
+    lego_slug = Column(Text)
 
     theme = db.relationship('ThemeModel', foreign_keys=[theme_id])
     root_theme = db.relationship('ThemeModel', foreign_keys=[root_theme_id])

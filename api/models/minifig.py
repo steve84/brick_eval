@@ -18,3 +18,5 @@ class MinifigModel(db.Model):
     rebrickable_id = Column(Integer)
     has_unique_part = Column(Boolean)
     year_of_publication = Column(Integer)
+    is_minidoll = Column(Boolean, nullable=False, server_default='f')
+    unique_character = Column(Boolean, nullable=False, server_default='f')

@@ -66,7 +66,26 @@ LEFT JOIN part_color_frequencies pcf ON p.id = pcf.part_id AND c.id = pcf.color_
 WHERE pcf.id IS NOT NULL;
 
 -- Update rebrickable ids
-\ir rebrickable_minifigs.sql
+\ir rebrickable_ids.sql
+
+
+-- Update unique_character on minfigs table
+create or replace view v_single_fig_occurance as
+select * from (
+select m.fig_num, count(i.id) as nbr from minifigs m
+join inventory_minifigs im on im.fig_id = m.id
+join inventories i on i.id = im.inventory_id and i.is_latest
+where i.is_latest
+group by m.fig_num) as nbr
+where nbr = 1;
+
+update minifigs set unique_character = '1' where fig_num in (
+select distinct m1.fig_num from minifigs m1
+join v_single_fig_occurance v on v.fig_num = m1.fig_num
+left join minifigs m2 on m1.id <> m2.id and (trim(both from split_part(lower(m1.name), ',', 1)) = trim(both from split_part(lower(m2.name), ',', 1)) or trim(both from split_part(lower(m1.name), '-', 1)) = trim(both from split_part(lower(m2.name), '-', 1)) or trim(both from split_part(lower(m1.name), ',', 1)) = trim(both from split_part(lower(m2.name), '-', 1)) or trim(both from split_part(lower(m1.name), '-', 1)) = trim(both from split_part(lower(m2.name), ',', 1)))
+where m2.id is null);
+
+DROP VIEW IF EXISTS v_single_fig_occurance;
 
 -- Generated FROM base tables
 INSERT INTO minifig_inventory_rel (inventory_id, inventory_minifig_id, quantity)
@@ -78,6 +97,18 @@ INSERT INTO set_inventory_rel (inventory_id, inventory_set_id)
 SELECT i.id, invs.id FROM inventory_sets invs
 LEFT JOIN sets s ON invs.set_id = s.id
 LEFT JOIN inventories_tmp i ON s.set_num = i.set_num;
+
+-- Update is_minidoll column on minifigs table
+update minifigs set is_minidoll = '1' where fig_num in (
+select distinct fig_num from minifigs m
+join inventory_minifigs im on im.fig_id = m.id
+join minifig_inventory_rel imr on imr.inventory_minifig_id = im.id
+join inventories i on i.id = imr.inventory_id
+join inventory_parts ip on ip.inventory_id = i.id
+join part_color_frequencies pcf on pcf.id = ip.part_color_frequency_id
+join parts p on p.id = pcf.part_id
+left join part_categories pc on pc.id = p.part_cat_id and p.name like 'Minidoll%'
+where pc.id is not null);
 
 -- Update inventories table (is_latest)
 DROP VIEW IF EXISTS v_latest_inventory;
@@ -144,7 +175,7 @@ DROP VIEW IF EXISTS v_latest_inventory;
 -- Update generated data --
 UPDATE sets
 SET
-      eol = (SELECT tmp_sets_info.eol
+      (eol, name_de, lego_slug) = (SELECT tmp_sets_info.eol, tmp_sets_info.name_de, tmp_sets_info.lego_slug
                             FROM tmp_sets_info
                             WHERE tmp_sets_info.set_num = sets.set_num)
 WHERE
@@ -343,7 +374,7 @@ UPDATE sets SET has_stickers = 't' WHERE id in (
 -- Update minifig properties
 DROP VIEW IF EXISTS v_minifig_has_unique_part;
 CREATE VIEW v_minifig_has_unique_part AS
-SELECT m.id, MIN(pcf.total_amount) = 1 AS has_unique_part FROM minifigs m
+SELECT m.id, MIN(pcf.total_amount - (im.quantity * ip.quantity) + 1) = 1 AS has_unique_part FROM minifigs m
 LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
 LEFT JOIN minifig_inventory_rel mir ON im.id = mir.inventory_minifig_id
 LEFT JOIN inventories i ON i.id = mir.inventory_id and i.is_latest = TRUE
@@ -580,6 +611,17 @@ left join parts p on p.id = pcf.part_id
 left join part_categories pc on pc.id = p.part_cat_id
 left join part_color_frequency_element_rel pcfr on pcfr.part_color_frequency_id = pcf.id
 left join element_prices ep on ep.element_id = pcfr.id;
+
+-- Create view for external data
+DROP VIEW IF EXISTS v_external_data;
+CREATE VIEW v_external_data AS
+(select 'update sets set eol = ''' || eol || ''' where set_num = ''' || set_num || ''';' as stmt from sets where eol <> '-1' order by set_num)
+union all
+(select 'insert into set_prices (set_id, retail_price, check_date) select id, ' || sp.retail_price || ', to_date(''' || sp.check_date || ''', ''YYYY-MM-DD'') from sets where set_num = ''' || s.set_num || ''';' as stmt from set_prices sp left join sets s on s.id = sp.set_id order by s.set_num, sp.check_date desc)
+union all
+(select 'insert into element_prices (element_id, provider_id, price) select id, ''' || 1 || ''', ' || ep.price || ' from part_color_frequency_element_rel where element_id = ''' || pcfer.element_id || ''';' from element_prices ep
+left join part_color_frequency_element_rel pcfer on pcfer.id = ep.element_id
+order by pcfer.element_id);
 
 DROP VIEW IF EXISTS v_minifig_has_unique_part;
 DROP VIEW IF EXISTS v_minifig_year_of_publication;

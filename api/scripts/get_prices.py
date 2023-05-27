@@ -105,9 +105,8 @@ with app.app_context():
 
     existing_prices = list()
     if max_days_since is not None:
-        price_query = db.session.query(price_query).filter(price_query.c.rnk == 1 and SetPriceModel.check_date > (datetime.now().date() - timedelta(days=max_days_since)))
+        price_query = db.session.query(price_query).filter(price_query.c.rnk == 1, price_query.c.check_date > (datetime.now().date() - timedelta(days=max_days_since)))
         existing_prices = [x for x in map(lambda x: x.set_id, price_query.all())]
-
 
     sets = db.session.query(SetModel).filter(*add_filters).filter(SetModel.id.notin_(existing_prices)).limit(max_items).all()
 
@@ -138,6 +137,8 @@ with app.app_context():
                             check_date=datetime.now().date()
                         ))
                         setrow.retail_price = int(price)
+                        setrow.name_de = set_data['name']
+                        setrow.lego_slug = set_data['slug']
                         if str(setrow.eol) not in ['2', '3']:
                             setrow.eol = '1'
 

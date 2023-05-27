@@ -11,13 +11,13 @@ python create_tmp_tables.py
 Get rebrickable ids of minifigs:
 
 ```
-python api/scripts/generate_sql_rebrickable_minifig.py
+python api/scripts/generate_sql_rebrickable_ids.py
 ```
 
 Copy sql files to docker:
 ```
 sudo docker-compose exec db rm -rf /var/lib/postgresql/data/{db_cleanup,db_migration,db_external_data,rebrickable_minifigs}.sql
-sudo docker cp api/db_cleanup.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_migration.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_external_data.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/rebrickable_minifigs.sql brickeval_db_1:/var/lib/postgresql/data
+sudo docker cp api/db_cleanup.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_migration.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/db_external_data.sql brickeval_db_1:/var/lib/postgresql/data && sudo docker cp api/rebrickable_ids.sql brickeval_db_1:/var/lib/postgresql/data
 ```
 
 Remove old tables and store some values (Not neccessary if you started with an empty database) 
@@ -51,21 +51,3 @@ Restore:
 sudo docker-compose exec db bin/bash -c 'psql -U postgres brick_eval < /var/lib/postgresql/data/db.dump'
 ```
 
-
-
-## Monkey Patch
-flask_restless/search.py
-
-```
-if '__' in field_name:
-    field_name, field_name_in_relation = \
-        field_name.split('__')
-    relation = getattr(model, field_name)
-    relation_model = relation.mapper.class_
-    field = getattr(relation_model, field_name_in_relation)
-    direction = getattr(field, val.direction)
-    -------------------
-    query = query.join(relation)
-    -------------------
-    query = query.order_by(direction())
-```

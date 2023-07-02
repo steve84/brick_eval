@@ -20,3 +20,4 @@ class MinifigModel(db.Model):
     year_of_publication = Column(Integer)
     is_minidoll = Column(Boolean, nullable=False, server_default='f')
     unique_character = Column(Boolean, nullable=False, server_default='f')
+    unique_parts = Column(Text)

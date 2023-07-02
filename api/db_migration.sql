@@ -390,19 +390,35 @@ LEFT JOIN inventories i ON i.id = im.inventory_id and i.is_latest = TRUE
 LEFT JOIN sets s ON i.set_id = s.id
 GROUP BY m.id;
 
+DROP VIEW IF EXISTS v_minifig_unique_parts;
+CREATE VIEW v_minifig_unique_parts AS
+select id, string_agg(name, ';') as unique_parts_text FROM
+(SELECT m.id, pc.name, (pcf.total_amount - (im.quantity * ip.quantity) + 1) = 1 AS has_unique_part FROM minifigs m
+LEFT JOIN inventory_minifigs im ON m.id = im.fig_id
+LEFT JOIN minifig_inventory_rel mir ON im.id = mir.inventory_minifig_id
+LEFT JOIN inventories i ON i.id = mir.inventory_id and i.is_latest = TRUE
+LEFT JOIN (SELECT inventory_id, part_color_frequency_id, sum(quantity) AS quantity FROM inventory_parts GROUP BY inventory_id, part_color_frequency_id) ip ON i.id = ip.inventory_id
+LEFT JOIN part_color_frequencies pcf ON ip.part_color_frequency_id = pcf.id
+LEFT JOIN parts p on p.id = pcf.part_id
+LEFT JOIN part_categories pc on pc.id = p.part_cat_id) as subq
+WHERE has_unique_part
+GROUP BY id;
+
 CREATE TABLE tmp_minifig_props (
-	id INTEGER UNIQUE NOT NULL,
-	has_unique_part BOOLEAN NOT NULL,
-    year_of_publication INTEGER NOT NULL
+    id INTEGER UNIQUE NOT NULL,
+    has_unique_part BOOLEAN,
+    year_of_publication INTEGER,
+    unique_parts_text TEXT
 );
 
 INSERT INTO tmp_minifig_props
-SELECT v1.id, v1.has_unique_part, v2.year_of_publication FROM v_minifig_has_unique_part v1
+SELECT v1.id, v1.has_unique_part, v2.year_of_publication, v3.unique_parts_text FROM v_minifig_has_unique_part v1
 LEFT JOIN v_minifig_year_of_publication v2 on v2.id = v1.id
-WHERE v1.has_unique_part IS NOT NULL AND v2.year_of_publication IS NOT NULL;
+LEFT JOIN v_minifig_unique_parts v3 on v3.id = v1.id
+WHERE v1.has_unique_part IS NOT NULL OR v2.year_of_publication IS NOT NULL OR v3.unique_parts_text IS NOT NULL;
 
-UPDATE minifigs SET (has_unique_part, year_of_publication) = (
-    SELECT has_unique_part, year_of_publication FROM tmp_minifig_props WHERE
+UPDATE minifigs SET (has_unique_part, year_of_publication, unique_parts) = (
+    SELECT has_unique_part, year_of_publication, unique_parts_text FROM tmp_minifig_props WHERE
     tmp_minifig_props.id = minifigs.id
 );
 
@@ -615,7 +631,7 @@ left join element_prices ep on ep.element_id = pcfr.id;
 -- Create view for external data
 DROP VIEW IF EXISTS v_external_data;
 CREATE VIEW v_external_data AS
-(select 'update sets set eol = ''' || eol || ''' where set_num = ''' || set_num || ''';' as stmt from sets where eol <> '-1' order by set_num)
+(select 'update sets set eol = ''' || eol || ''', name_de = ' || coalesce('''' || name_de || '''', 'null') || ', lego_slug = ' || coalesce('''' || lego_slug || '''', 'null') || ' where set_num = ''' || set_num || ''';' as stmt from sets where eol <> '-1' order by set_num)
 union all
 (select 'insert into set_prices (set_id, retail_price, check_date) select id, ' || sp.retail_price || ', to_date(''' || sp.check_date || ''', ''YYYY-MM-DD'') from sets where set_num = ''' || s.set_num || ''';' as stmt from set_prices sp left join sets s on s.id = sp.set_id order by s.set_num, sp.check_date desc)
 union all
@@ -625,6 +641,7 @@ order by pcfer.element_id);
 
 DROP VIEW IF EXISTS v_minifig_has_unique_part;
 DROP VIEW IF EXISTS v_minifig_year_of_publication;
+DROP VIEW IF EXISTS v_minifig_unique_parts;
 
 DROP TABLE IF EXISTS colors_tmp;
 DROP TABLE IF EXISTS elements_tmp;

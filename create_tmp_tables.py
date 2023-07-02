@@ -66,6 +66,13 @@ for gz_file in gz_files:
         df['parent_id'] = df['parent_id'].where(
             pd.notna,
             None)
+            
+    # fix problem in elements data
+    if table_name == 'elements':
+        df['design_id'] = df['design_id'].astype('object')
+        df['design_id'] = df['design_id'].where(
+            pd.notna,
+            None)
 
     table_name += '_tmp'
     print("Create table '{}'".format(table_name))

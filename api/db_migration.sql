@@ -69,24 +69,6 @@ WHERE pcf.id IS NOT NULL;
 \ir rebrickable_ids.sql
 
 
--- Update unique_character on minfigs table
-create or replace view v_single_fig_occurance as
-select * from (
-select m.fig_num, count(i.id) as nbr from minifigs m
-join inventory_minifigs im on im.fig_id = m.id
-join inventories i on i.id = im.inventory_id and i.is_latest
-where i.is_latest
-group by m.fig_num) as nbr
-where nbr = 1;
-
-update minifigs set unique_character = '1' where fig_num in (
-select distinct m1.fig_num from minifigs m1
-join v_single_fig_occurance v on v.fig_num = m1.fig_num
-left join minifigs m2 on m1.id <> m2.id and (trim(both from split_part(lower(m1.name), ',', 1)) = trim(both from split_part(lower(m2.name), ',', 1)) or trim(both from split_part(lower(m1.name), '-', 1)) = trim(both from split_part(lower(m2.name), '-', 1)) or trim(both from split_part(lower(m1.name), ',', 1)) = trim(both from split_part(lower(m2.name), '-', 1)) or trim(both from split_part(lower(m1.name), '-', 1)) = trim(both from split_part(lower(m2.name), ',', 1)))
-where m2.id is null);
-
-DROP VIEW IF EXISTS v_single_fig_occurance;
-
 -- Generated FROM base tables
 INSERT INTO minifig_inventory_rel (inventory_id, inventory_minifig_id, quantity)
 SELECT i.id, im.id, im.quantity FROM inventory_minifigs im
@@ -127,6 +109,24 @@ GROUP BY im.fig_id) im_max ON im_max.max_version = ifig.version AND im_max.fig_i
 
 UPDATE inventories SET is_latest = TRUE WHERE inventories.id IN (SELECT id FROM v_latest_inventory);
 UPDATE inventories SET is_latest = FALSE WHERE inventories.id NOT IN (SELECT id FROM v_latest_inventory);
+
+-- Update unique_character on minfigs table
+create or replace view v_single_fig_occurance as
+select * from (
+select m.fig_num, count(i.id) as nbr from minifigs m
+join inventory_minifigs im on im.fig_id = m.id
+join inventories i on i.id = im.inventory_id and i.is_latest
+where i.is_latest
+group by m.fig_num) as nbr
+where nbr = 1;
+
+update minifigs set unique_character = '1' where fig_num in (
+select distinct m1.fig_num from minifigs m1
+join v_single_fig_occurance v on v.fig_num = m1.fig_num
+left join minifigs m2 on m1.id <> m2.id and (trim(both from split_part(lower(m1.name), ',', 1)) = trim(both from split_part(lower(m2.name), ',', 1)) or trim(both from split_part(lower(m1.name), '-', 1)) = trim(both from split_part(lower(m2.name), '-', 1)) or trim(both from split_part(lower(m1.name), ',', 1)) = trim(both from split_part(lower(m2.name), '-', 1)) or trim(both from split_part(lower(m1.name), '-', 1)) = trim(both from split_part(lower(m2.name), ',', 1)))
+where m2.id is null);
+
+DROP VIEW IF EXISTS v_single_fig_occurance;
 
 
 -- Update part_color_frequencies table (quantity)
@@ -211,28 +211,23 @@ WHERE s.id IS NOT NULL;
 
 -- Calculate scores
 insert into scores (inventory_id, score, calc_date)
-select id, score, current_date from (
-select id, sum((quantity * 1.0 / num_parts) * ((1 - ((total_amount - quantity) / (max_amount * 1.0)))) ^ 100) as score from (
-select i.id, ip.quantity, minv.num_parts, mp.max_amount, pcf.total_amount from inventories i,
+select id, sum((quantity * 1.0) / total_amount) / count(id) as score, current_date
+from (select subq.id, subq.quantity, subq.total_amount, row_number() OVER (PARTITION BY subq.id ORDER BY subq.total_amount) as nbr FROM (select i.id, ip.part_color_frequency_id, sum(ip.quantity) as quantity, max(pcf.total_amount) as total_amount from inventories i,
 inventory_parts ip,
-part_color_frequencies pcf,
-(select inventory_id, sum(quantity) as num_parts from inventory_parts group by inventory_id) minv,
-(select max(total_amount) as max_amount from part_color_frequencies) mp
-where ip.inventory_id = i.id and pcf.id = ip.part_color_frequency_id and i.is_latest = 't' and i.set_id is not null and minv.inventory_id = i.id) subq
-group by id) as subq;
+part_color_frequencies pcf
+where ip.inventory_id = i.id and pcf.id = ip.part_color_frequency_id and i.is_latest = 't' and i.set_id is not null and pcf.total_amount > 0
+group by i.id, ip.part_color_frequency_id, pcf.total_amount) as subq) as subq
+where nbr <= 15
+group by id;
 
 insert into scores (inventory_id, score, calc_date)
-select id, score, current_date from (
-select id, sum((quantity * 1.0 / num_parts) * ((1 - ((total_amount - quantity) / (max_amount * 1.0)))) ^ 100) as score from (
-select i.id, ip.quantity, m.num_parts, mp.max_amount, pcf.total_amount from inventory_minifigs im,
-(select inventory_id, max(inventory_minifig_id) as inventory_minifig_id from minifig_inventory_rel group by inventory_id) mir,
-inventories i,
+select id, sum(part_score) / count(part_color_frequency_id) as score, current_date from (select i.id, ip.part_color_frequency_id, sum(ip.quantity * 1.0) / pcf.total_amount as part_score from inventories i,
 inventory_parts ip,
-part_color_frequencies pcf,
-minifigs m,
-(select max(total_amount) as max_amount from part_color_frequencies) mp
-where mir.inventory_minifig_id = im.id and i.id = mir.inventory_id and ip.inventory_id = i.id and pcf.id = ip.part_color_frequency_id and i.is_latest = 't' and ip.is_spare = 'f' and im.fig_id = m.id) subq
-group by id) as subq;
+part_color_frequencies pcf
+where ip.inventory_id = i.id and pcf.id = ip.part_color_frequency_id and i.is_latest = 't' and i.set_id is null and ip.is_spare = 'f' and pcf.total_amount > 0
+group by i.id, ip.part_color_frequency_id, pcf.total_amount) as subq
+group by id;
+
 
 -- Set score ids
 CREATE TABLE tmp_act_set_score (

@@ -638,6 +638,50 @@ DROP VIEW IF EXISTS v_minifig_has_unique_part;
 DROP VIEW IF EXISTS v_minifig_year_of_publication;
 DROP VIEW IF EXISTS v_minifig_unique_parts;
 
+-- Create view for brickadvisor.ch
+DROP VIEW IF EXISTS v_brickadvisor_data;
+CREATE VIEW v_brickadvisor_data AS
+select
+case when m.rebrickable_id is not null
+then 'https://cdn.rebrickable.com/media/thumbs/sets/' || m.fig_num || '/' || m.rebrickable_id || '.jpg/300x300p.jpg'
+else 'https://rebrickable.com/static/img/nil_mf.jpg' end as minifig_img_link,
+case when s.rebrickable_id is not null
+then 'https://cdn.rebrickable.com/media/thumbs/sets/' || s.set_num || '/' || s.rebrickable_id || '.jpg/300x300p.jpg'
+else 'https://rebrickable.com/static/img/nil_mf.jpg' end as set_img_link,
+m.name as fig_name,
+t.name as theme_name,
+rt.name as root_theme_name,
+sc.rating,
+sc.score as minifig_score,
+im.quantity,
+m.has_unique_part,
+m.unique_parts,
+m.unique_character,
+s.set_num,
+s.eol,
+s.name as set_name,
+s.name_de as set_name_de,
+s.lego_slug as lego_slug,
+s.num_parts,
+m.year_of_publication,
+s.year_of_publication as set_year_of_publication,
+s.has_stickers,
+scs.rating as set_rating,
+scs.score as set_score,
+sp.retail_price as set_price
+from (SELECT * FROM v_scores WHERE id IN (SELECT first_value(id) OVER (PARTITION BY is_set, entity_id ORDER BY calc_date DESC) from v_scores)) sc
+left join inventory_minifigs im on im.id = sc.entity_id
+left join minifigs m on m.id = im.fig_id
+left join inventories i on i.id = im.inventory_id
+left join sets s on s.id = i.set_id
+left join themes t on t.id = s.theme_id
+left join themes rt on rt.id = s.root_theme_id
+left join (SELECT * FROM v_scores WHERE id IN (SELECT first_value(id) OVER (PARTITION BY is_set, entity_id ORDER BY calc_date DESC) from v_scores)) scs on s.id = scs.entity_id and scs.is_set = true
+join (SELECT * FROM set_prices WHERE id IN (SELECT first_value(id) OVER (PARTITION BY set_id ORDER BY check_date DESC) from set_prices)) sp on sp.set_id = s.id
+where sc.is_set = false and s.eol not in ('-1', '0') and s.num_parts > 0 and m.has_unique_part is not null and not m.is_minidoll and sp.retail_price is not null and i.is_latest
+order by s.set_num, m.name;
+
+
 DROP TABLE IF EXISTS colors_tmp;
 DROP TABLE IF EXISTS elements_tmp;
 DROP TABLE IF EXISTS inventories_tmp;
